@@ -1,0 +1,335 @@
+%% 智寓——HarmonyOS 智能宿舍管家 · 类图（对应报告表 2.1 / 3.1 / 3.2）
+%% 来源：design/系统架构设计.md 第 5 章；可直接在 Mermaid 编辑器中渲染与修改。
+%% 关系说明：*-- 聚合 / --> 依赖调用 / ..> 使用或产出 / ..|> 实现
+classDiagram
+    direction TB
+
+    class DeviceType {
+        <<enumeration>>
+        LIGHT
+        AIR_CONDITIONER
+        CURTAIN
+        DOOR_LOCK
+        FAN
+        SOCKET
+    }
+    class DeviceStatus {
+        <<enumeration>>
+        RUNNING
+        IDLE
+        FAULT
+        OFFLINE
+    }
+    class ResultCode {
+        <<enumeration>>
+        OK
+        NO_CHANGE
+        NOT_FOUND
+        INVALID_PARAM
+        DEVICE_OFFLINE
+        CONFLICT_SKIPPED
+        STORAGE_ERROR
+        UNKNOWN
+    }
+    class RuleExecStatus {
+        <<enumeration>>
+        SUCCESS
+        PARTIAL
+        FAILED
+        SKIPPED_DEDUP
+        SKIPPED_CONFLICT
+        SKIPPED_DISABLED
+    }
+
+    class DeviceParams {
+        <<union>>
+        LightParams
+        AirConditionerParams
+        CurtainParams
+        DoorLockParams
+        FanParams
+        SocketParams
+    }
+    class Device {
+        +string id
+        +string name
+        +DeviceType type
+        +boolean powerOn
+        +DeviceParams params
+        +boolean online
+        +DeviceStatus status
+        +boolean locked
+        +number createdAt
+        +number lastUpdated
+    }
+    class EnvironmentData {
+        +number temperature
+        +number humidity
+        +number illuminance
+        +number airQuality
+        +boolean humanPresence
+        +number timestamp
+        +EnvSource source
+    }
+    class AutomationCondition {
+        +string id
+        +SensorType sensorType
+        +Operator operator
+        +number threshold
+        +string unit
+    }
+    class AutomationAction {
+        +string id
+        +string targetDeviceId
+        +DeviceCommand command
+        +ParamValue value
+        +number order
+    }
+    class AutomationRule {
+        +string id
+        +string name
+        +boolean enabled
+        +ConditionLogic logic
+        +AutomationCondition[] conditions
+        +AutomationAction[] actions
+        +number priority
+        +boolean lastSatisfied
+        +number lastTriggeredAt
+        +number executionCount
+        +number createdAt
+        +number updatedAt
+    }
+    class DeviceStateSnapshot {
+        +string deviceId
+        +boolean powerOn
+        +DeviceParams params
+        +boolean locked
+        +number capturedAt
+    }
+    class Scene {
+        +string id
+        +string name
+        +SceneType type
+        +DeviceStateSnapshot[] deviceStates
+        +boolean isPreset
+        +DeviceStateSnapshot[] returnSnapshot
+    }
+    class RuleExecutionLog {
+        +string id
+        +number timestamp
+        +string ruleId
+        +EnvironmentData snapshot
+        +AutomationCondition[] matchedConditions
+        +ActionExecutionDetail[] executedActions
+        +ActionExecutionDetail[] skippedActions
+        +RuleExecStatus status
+        +string errorMsg
+        +number durationMs
+    }
+    class OperationLog {
+        +string id
+        +LogActor actor
+        +string deviceId
+        +ResultCode result
+    }
+    class AppSettings {
+        +boolean automationEnabled
+        +boolean simulationEnabled
+        +number sampleIntervalMs
+        +number logLimit
+        +number schemaVersion
+    }
+    class AppState {
+        +number schemaVersion
+        +Device[] devices
+        +AutomationRule[] rules
+        +Scene[] scenes
+        +AppSettings settings
+        +EnvironmentData environment
+        +LogBundle logs
+        +DeviceStateSnapshot[] returnSnapshot
+        +RunMode currentMode
+    }
+    class CommandResult~T~ {
+        +boolean success
+        +boolean changed
+        +ResultCode code
+        +string message
+        +T data
+        +number timestamp
+    }
+    class RuleEvaluationReport {
+        +number evaluatedAt
+        +EnvironmentData snapshot
+        +string skipReason
+        +RuleOutcome[] outcomes
+        +RuleExecutionLog[] newLogs
+        +number durationMs
+    }
+    class SceneApplyReport {
+        +string sceneId
+        +number appliedCount
+        +number failedCount
+        +boolean restoredFromSnapshot
+    }
+
+    class AppDataRepository {
+        -AppState state
+        -Map~string, StateChangeHandler~ subscribers
+        -WriteQueue queue
+        +load() AppState
+        +flush(partition) Promise~CommandResult~void~~
+        +reset(scope) Promise~CommandResult~AppState~~
+        +subscribe(handler) Unsubscribe
+        +listDevices() Device[]
+        +getState() AppState
+        +commitRuleLogs(report) Promise~CommandResult~void~~
+        -notify(change) void
+    }
+    class PreferencesStore {
+        -preferences.Preferences pref
+        +init(context) void
+        +get(key, defValue) string
+        +has(key) boolean
+        +put(key, json) Promise~void~
+        +delete(key) Promise~void~
+        +clear() Promise~void~
+        +flush() Promise~void~
+    }
+    class Serializer {
+        +encode(state) Record~string, string~
+        +decode(partition, raw) AppState
+    }
+    class SchemaMigration {
+        +SCHEMA_VERSION number
+        +migrate(raw, fromVersion) AppState
+    }
+    class WriteQueue {
+        -Promise~void~ tail
+        +enqueue(task) Promise~void~
+    }
+
+    class DeviceService {
+        +setPower(id, on, actor) Promise~CommandResult~Device~~
+        +setParam(id, key, value, actor) Promise~CommandResult~Device~~
+        +addDevice(type, name) Promise~CommandResult~Device~~
+        +removeDevice(id) Promise~CommandResult~void~~
+        -validate(device, key, value) ResultCode
+    }
+    class EnvironmentService {
+        +getSnapshot() EnvironmentData
+        +adjust(sensorType, value, source) Promise~CommandResult~EnvironmentData~~
+    }
+    class RuleService {
+        +create(rule) Promise~CommandResult~AutomationRule~~
+        +update(rule) Promise~CommandResult~AutomationRule~~
+        +remove(id) Promise~CommandResult~void~~
+        +toggle(id, enabled) Promise~CommandResult~AutomationRule~~
+        -resetDedup(ruleId) void
+    }
+    class RuleEngine {
+        -Map~string, boolean~ dedup
+        +evaluate(snapshot) Promise~RuleEvaluationReport~
+        -sortRules(rules) AutomationRule[]
+        -evalConditions(rule, snapshot) boolean
+        -buildExecutionLog(outcome) RuleExecutionLog
+    }
+    class RuleActionExecutor {
+        +execute(action, guard, actor) Promise~ActionOutcome~
+        -commandToParamKey(command) ParamKey
+    }
+    class WriteGuard {
+        -Map~string, Set~string~~ written
+        +claim(deviceId, paramKey, ruleId) boolean
+        +reset() void
+    }
+    class SceneService {
+        +apply(sceneId) Promise~SceneApplyReport~
+        -captureSnapshot() DeviceStateSnapshot[]
+    }
+    class StatisticsService {
+        +buildLineModel(logs, sensorType) LineChartModel
+        +buildBarModel(logs, groupBy) BarChartModel
+        +successRate(logs) number
+    }
+    class LogService {
+        +query(filter) LogRecord[]
+        +appendOperation(log) void
+        +appendEnvironment(log) void
+        +appendSceneSwitch(log) void
+        -trimFifo(bundle) void
+    }
+    class ExportService {
+        +exportToFilesDir(state, format) CommandResult~string~
+    }
+
+    class MockDeviceAdapter {
+        +apply(command) CommandResult~Device~
+        +setDeviceStatus(id, status) CommandResult~Device~
+        +setOnline(id, online) CommandResult~Device~
+    }
+    class EnvironmentSimulator {
+        +start(intervalMs) void
+        +stop() void
+        +tick() void
+    }
+    class TimerHost {
+        -number handle
+        -Map~string, TimerCallback~ callbacks
+        +register(cb, intervalMs) string
+        +release(handle) void
+        +pause() void
+        +resume() void
+    }
+    class EntryAbility {
+        +onCreate(want, launchParam) void
+        +onWindowStageCreate(windowStage) void
+        +onWindowStageDestroy() void
+        +onForeground() void
+        +onBackground() void
+        +onDestroy() void
+    }
+
+    AppState *-- Device : 聚合 devices
+    AppState *-- AutomationRule : 聚合 rules
+    AppState *-- Scene : 聚合 scenes
+    AppState *-- AppSettings : 聚合 settings
+    AppState *-- EnvironmentData : 聚合 environment
+    Device *-- DeviceParams : params
+    Device ..> DeviceType : 使用
+    Device ..> DeviceStatus : 使用
+    AutomationRule *-- AutomationCondition : conditions
+    AutomationRule *-- AutomationAction : actions
+    Scene *-- DeviceStateSnapshot : deviceStates / returnSnapshot
+    RuleExecutionLog ..> RuleExecStatus : 使用
+    CommandResult~T~ ..> ResultCode : 使用
+
+    AppDataRepository *-- AppState : 单一数据源
+    AppDataRepository *-- WriteQueue : 串行写
+    AppDataRepository --> PreferencesStore : MI-19
+    AppDataRepository --> Serializer : 编解码
+    AppDataRepository --> SchemaMigration : 版本迁移
+    PreferencesStore ..> PreferencesOptions : 包装 SDK Options
+
+    DeviceService --> AppDataRepository : 读写内存态
+    DeviceService --> MockDeviceAdapter : 执行打桩
+    DeviceService --> LogService : 写 OperationLog
+    EnvironmentService --> AppDataRepository : 读写快照
+    EnvironmentService --> RuleEngine : 触发求值
+    RuleService --> AppDataRepository : 规则 CRUD
+    RuleEngine --> RuleActionExecutor : 执行动作
+    RuleEngine --> WriteGuard : 冲突登记
+    RuleEngine ..> RuleEvaluationReport : 产出
+    RuleEngine ..> RuleExecutionLog : 唯一写入方
+    RuleActionExecutor --> DeviceService : claim 通过后调用
+    SceneService --> DeviceService : 逐条下发
+    SceneService ..> SceneApplyReport : 产出
+    StatisticsService --> AppDataRepository : 读真实日志
+    LogService --> AppDataRepository : 写日志分区
+    ExportService --> AppDataRepository : 读全量状态
+
+    EntryAbility --> AppDataRepository : 初始化 / 收尾
+    EntryAbility --> TimerHost : 生命周期托管
+    TimerHost --> EnvironmentSimulator : 驱动 tick
+    EnvironmentSimulator --> EnvironmentService : 更新快照
+    MockDataFactory ..> AppState : 首次默认数据

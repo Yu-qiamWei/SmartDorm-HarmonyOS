@@ -1,0 +1,210 @@
+%% 智寓——HarmonyOS 智能宿舍管家 · 时序图归档集合
+%% 来源：design/系统架构设计.md 第 6 章（FLOW-01 ~ FLOW-04）
+%% 本文件含 4 张相互独立的 sequenceDiagram，用「%% ===== FLOW-XX =====」分隔。
+%% 在 Mermaid 编辑器中请按分隔逐张截取渲染；Word 报告图 3.1 取 FLOW-01，图 6.2 取 FLOW-03。
+
+%% ===== FLOW-01 规则引擎求值主流程（对应报告图 3.1，SC-02 核心，含 WriteGuard 护栏）=====
+sequenceDiagram
+    autonumber
+    participant UI as 页面 / Environment 页
+    participant ES as EnvironmentService
+    participant RE as RuleEngine
+    participant WG as WriteGuard
+    participant RAE as RuleActionExecutor
+    participant DS as DeviceService
+    participant MDA as MockDeviceAdapter
+    participant LS as LogService
+    participant REPO as AppDataRepository
+    participant PS as PreferencesStore
+
+    UI->>ES: adjust(sensorType, value, MANUAL)
+    ES->>ES: validateRange(sensorType, value) 越界则拒绝/钳制
+    ES->>REPO: 更新 environment 快照
+    ES->>LS: appendEnvironment(EnvironmentLog)
+    ES->>RE: evaluate(snapshot)
+    RE->>REPO: getState() 读 settings 与启用规则
+    alt automationEnabled = false
+        RE-->>ES: RuleEvaluationReport{skipReason: '自动化总开关关闭', newLogs: []}
+    else 开启
+        RE->>WG: reset() 本轮新建登记表
+        RE->>RE: sortRules(priority ↑ → createdAt ↑ → id)
+        loop 有序规则列表逐条
+            RE->>RE: evalConditions(rule, snapshot) AND 组合
+            alt 条件不满足
+                RE->>RE: rule.lastSatisfied = false（复位去重）
+            else 条件满足 且 lastSatisfied=false（边沿）
+                RE->>RE: rule.lastSatisfied = true
+                loop rule.actions 按 order 升序
+                    RE->>WG: claim(deviceId, paramKey, ruleId)
+                    alt claim = false（同设备同参数已被写过）
+                        RE->>RE: ActionOutcome{code: CONFLICT_SKIPPED}
+                        Note over RE,DS: ★ 禁止隐式覆盖，不得调用 DeviceService
+                    else claim = true
+                        RE->>RAE: execute(action, guard, RULE)
+                        RAE->>DS: setPower / setParam(id, key, value, RULE)
+                        DS->>MDA: apply(command)
+                        MDA-->>DS: CommandResult~Device~
+                        DS->>LS: appendOperation(OperationLog)
+                        DS->>REPO: 更新内存态
+                        DS-->>RAE: CommandResult~Device~
+                        RAE-->>RE: ActionOutcome
+                    end
+                end
+                RE->>RE: buildExecutionLog(outcome) 仅此处写 RuleExecutionLog
+            else 条件持续成立 且 lastSatisfied=true
+                RE->>RE: 跳过，不产生重复执行日志
+            end
+        end
+        RE->>REPO: commitRuleLogs(report) 唯一提交入口
+        RE->>REPO: flush() 经 WriteQueue 串行
+        REPO->>PS: put(KEY-02/03/07/08/06, json) → flush()
+        REPO-->>RE: CommandResult~void~
+        RE->>REPO: notify(ChangeSet)
+        RE-->>ES: RuleEvaluationReport
+    end
+    ES-->>UI: CommandResult~EnvironmentData~ + Toast 反馈
+    REPO-->>UI: StateChangeHandler 刷新首页 / 规则 / 统计三处
+
+%% ===== FLOW-02 设备控制与状态同步流程 =====
+sequenceDiagram
+    autonumber
+    participant UI as DeviceDetail / DeviceCard
+    participant DS as DeviceService
+    participant REPO as AppDataRepository
+    participant MDA as MockDeviceAdapter
+    participant LS as LogService
+    participant Q as WriteQueue
+    participant PS as PreferencesStore
+    participant RE as RuleEngine
+
+    UI->>DS: setPower(id, on, USER) 或 setParam(id, key, value, USER)
+    DS->>REPO: getState().devices 查设备
+    alt 设备不存在
+        DS-->>UI: CommandResult{code: NOT_FOUND, changed: false}
+    else 设备 offline 或 status=FAULT/OFFLINE
+        DS-->>UI: CommandResult{code: DEVICE_OFFLINE} 首页异常数同步
+    else 参数越界 / 类型不符 / params.kind≠type
+        DS-->>UI: CommandResult{code: INVALID_PARAM} 原子性不写入
+    else 校验通过
+        DS->>DS: 幂等判断：与当前状态是否相同
+        alt 状态相同
+            DS-->>UI: CommandResult{code: NO_CHANGE} 不写日志
+        else 状态不同
+            DS->>MDA: apply(DeviceCommandContext)
+            MDA-->>DS: CommandResult~Device~（Mock 可返回失败）
+            DS->>REPO: 更新内存态 Device
+            DS->>LS: appendOperation(OperationLog actor=USER)
+            LS->>LS: trimFifo() 按 Q-12 上限淘汰最旧
+            DS->>Q: enqueue(flush 任务)
+            Q->>PS: put(KEY-02, json) + put(KEY-07, json)
+            PS->>PS: flush() Promise~void~
+            Q-->>DS: CommandResult~void~
+            DS->>REPO: notify(ChangeSet)
+            REPO-->>UI: 刷新卡片 / 聚合数值 / 状态徽标
+            DS->>RE: evaluate(snapshot) 触发联动闭环
+            DS-->>UI: CommandResult~Device~{code: OK, changed: true}
+        end
+    end
+
+%% ===== FLOW-03 首次启动 / 退出 / 重启数据恢复流程（对应报告图 6.2）=====
+sequenceDiagram
+    autonumber
+    participant SYS as 系统 / 用户
+    participant EA as EntryAbility
+    participant PS as PreferencesStore
+    participant REPO as AppDataRepository
+    participant SER as Serializer
+    participant MIG as SchemaMigration
+    participant MDF as MockDataFactory
+    participant TH as TimerHost
+    participant PG as pages/Index
+
+    SYS->>EA: 冷启动 UIAbility
+    EA->>PS: init(this.context) → getPreferencesSync(context, {name:'smartdorm_store'})
+    PS-->>EA: preferences.Preferences 句柄（同步，避免竞态）
+    EA->>REPO: load()
+    REPO->>PS: has(KEY-01) / getSync(KEY-01, '0')
+    alt 无 KEY-01（首次启动）
+        REPO->>MDF: createDefaultAppState()
+        MDF-->>REPO: 6 设备 + 5 传感器初值 + 4 预置场景 + 空规则/日志 + 默认设置
+        REPO->>PS: put(KEY-01..KEY-10, json) → flush()
+    else 已有版本键
+        loop 10 个分区逐区
+            REPO->>PS: getSync(key, '')
+            REPO->>SER: decode(partition, raw)
+            alt 反序列化失败 / 类型不符
+                SER-->>REPO: 该分区降级默认值 + 系统日志（不崩溃）
+            else 成功
+                SER-->>REPO: 分区对象
+            end
+        end
+        REPO->>MIG: migrate(state, fromVersion)
+        alt fromVersion < SCHEMA_VERSION
+            MIG->>MIG: migrate_v1_to_v2 ... 逐级链式迁移
+            MIG->>PS: put(KEY-01, 新版本号) → flush()
+        end
+        MIG-->>REPO: AppState
+    end
+    REPO-->>EA: AppState（内存态单一数据源）
+    EA->>EA: onWindowStageCreate(windowStage)
+    EA->>PG: windowStage.loadContent('pages/Index')
+    PG->>REPO: subscribe(handler) 保存 unsubscribe
+    PG-->>SYS: 渲染真实数据（非首次初始化流程）
+
+    Note over EA,TH: 前台 / 后台生命周期
+    EA->>EA: onForeground()
+    EA->>TH: resume()（settings.simulationEnabled=true 时 setInterval）
+    EA->>EA: onBackground()
+    EA->>TH: pause() → clearInterval(handle)，handle=-1
+
+    Note over SYS,REPO: 用户操作期间：Service 真实改状态 → 写日志 → 串行 flush
+    SYS->>EA: 退出应用
+    EA->>TH: pause() / release() 清空句柄与回调表
+    EA->>REPO: flush() 最后一次落盘（onWindowStageDestroy / onDestroy）
+    REPO->>PS: put(...) → flush()
+
+    SYS->>EA: 再次冷启动（重启）
+    EA->>REPO: load() 走「已有版本键」分支，不进入首次初始化
+    REPO-->>EA: 与退出前一致的状态
+    EA->>PG: loadContent('pages/Index')
+    PG-->>SYS: 逐项核对：设备状态(含亮度75)/规则/场景/环境设置/四类日志
+    Note over SYS,PG: 留存真实截图与录屏：表 5.1 / 图 6.2（真机接入后补测）
+
+%% ===== FLOW-04 场景切换流程（补充）=====
+sequenceDiagram
+    autonumber
+    participant UI as SceneList / SceneCard
+    participant SS as SceneService
+    participant REPO as AppDataRepository
+    participant DS as DeviceService
+    participant LS as LogService
+    participant PS as PreferencesStore
+    participant RE as RuleEngine
+
+    UI->>SS: apply(sceneId)
+    SS->>REPO: getState() 读 scenes / returnSnapshot / currentSceneId
+    alt 目标为「离寝」AWAY
+        SS->>SS: captureSnapshot() 保存当前用户预设状态
+        SS->>REPO: 写 returnSnapshot（KEY-10）并 flush
+        SS->>SS: targets = scene.deviceStates
+    else 目标为「回寝」RETURN
+        SS->>REPO: 读取 returnSnapshot
+        REPO-->>SS: 用户离寝前预设快照
+        SS->>SS: targets = returnSnapshot（非系统默认值）
+    else 其他场景
+        SS->>SS: targets = scene.deviceStates
+    end
+    loop targets 逐设备
+        SS->>DS: setPower / setParam(..., SCENE)
+        DS-->>SS: CommandResult~Device~
+        alt 失败（设备缺失 / 非法参数 / 离线）
+            SS->>SS: failedCount++，记录 SceneApplyItem
+        else 成功
+            SS->>SS: appliedCount++（NO_CHANGE 计 noChangeCount）
+        end
+    end
+    SS->>LS: appendSceneSwitch(SceneSwitchLog)
+    SS->>REPO: 更新 currentMode / currentSceneId 并 notify
+    SS->>PS: put(KEY-04/09/10, json) → flush()
+    SS->>RE: evaluate(当前环境快照) 按需联动（FR-05-08）
+    SS-->>UI: SceneApplyReport（失败项 UI 可见，不静默）
