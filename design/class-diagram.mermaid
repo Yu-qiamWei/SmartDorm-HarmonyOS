@@ -409,28 +409,54 @@ classDiagram
     class PreferencesStore {
         <<阶段四>>
         -preferences.Preferences pref
+        -boolean ready
         +init(context) void
-        +get(key, defValue) string
+        +isReady() boolean
         +has(key) boolean
+        +getRaw(key) string
         +put(key, json) Promise~void~
-        +delete(key) Promise~void~
-        +clear() Promise~void~
-        +flush() Promise~void~
+        +del(key) Promise~void~
+        +putSync(key, json) void
+        +delSync(key) void
+        +flushAsync() Promise~void~
+        +flushSyncNow() void
+        +lastErrorCode() number
     }
     class Serializer {
         <<阶段四>>
-        +encode(state) Record~string, string~
-        +decode(partition, raw) AppState
+        +encodePartition(partition, state) EncodeResult
+        +encodeHeader(header) string
+        +decodeHeader(raw) DecodeResult
+        +assemblePartition(partition, headerRaw, chunkRaws) DecodeResult
+        +decodeRuntime(raw) DecodeResult
+        +defaultRuntime(now) RuntimeMeta
     }
     class SchemaMigration {
         <<阶段四>>
-        +SCHEMA_VERSION number
-        +migrate(raw, fromVersion) AppState
+        +TARGET number
+        +migrate(state, fromVersion) MigrationResult
+        +migrateV0ToV1(state) AppState
+    }
+    class StorageDiagnostics {
+        <<阶段四>>
+        -DiagnosticEntry[] ring
+        -number seq
+        +record(level, code, detail) void
+        +list() DiagnosticEntry[]
+        +size() number
+        +clear() void
     }
     class WriteQueue {
         <<阶段四>>
         -Promise~void~ tail
-        +enqueue(task) Promise~void~
+        -Set~StoragePartition~ dirty
+        +configure(provider, writer) void
+        +mark(partitions) void
+        +flushNow(partitions) Promise~void~
+        +flushNowSync() void
+        +drain() Promise~void~
+        +pendingPartitions() StoragePartition[]
+        +stats() QueueStats
     }
 
     %% ——————————————— 业务层（阶段三实现，接口已在 ServiceContracts 落地）———————————————

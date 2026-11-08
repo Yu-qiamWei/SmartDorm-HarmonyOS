@@ -9,6 +9,10 @@
 %%   · 阶段三实现：FLOW-01 / FLOW-02 / FLOW-04 的服务调用链（图中标注 <<阶段三>> 的参与者）
 %%   · 阶段四实现：PreferencesStore / WriteQueue 等落盘环节（图中以 Note 明确标注「阶段四」）
 %%   · 因此 FLOW-03 当前**整体尚未实现**，仅真实反映 onCreate/onWindowStageCreate 的现状部分
+%% 【V1.0.4 · 分块持久化】FLOW-02 / FLOW-03 中阶段四落盘环节由「10 键整体 put」改为：
+%%   块头 <base>.hdr 作提交点 + 数据块 <base>.cNNNN（7000 字符/块），写序「块 → 头 → 删旧块」，
+%%   本批末尾只调用一次 flush()；加载期校验块头 n 与实际块数（缺块判损坏，多余块不算）。
+%%   详见 design/系统架构设计.md §8.6.1。
 %% 【V1.0.3 裁决】原 FLOW-02「设备变更后联动求值」与 FLOW-04「场景切换后按需联动」两处调用**已删除**：
 %%   条件判定的输入只有环境采样值，设备态与场景切换均不改变采样值，调用必为空跑且会消费 dedup 边沿→造成偶发漏触发（负收益）。
 %% 调用链约束：服务 → LogService / IStateWriter → AppDataRepository → （阶段四）WriteQueue → PreferencesStore；
@@ -114,7 +118,7 @@ sequenceDiagram
             DS-->>UI: CommandResult[Device]{code: OK, changed: true}
         end
     end
-    Note over REPO: 阶段四：commit* 标记分区 dirty → WriteQueue.enqueue → PreferencesStore.put/flush
+    Note over REPO: 阶段四：commit* 标记分区 dirty → WriteQueue.mark → 执行期取快照 → writeChunks/writeHeader/trimChunks → 本批末尾一次 flush()
 
 %% ===== FLOW-03 首次启动 / 退出 / 重启数据恢复流程（对应报告图 6.2）=====
 sequenceDiagram
@@ -139,12 +143,13 @@ sequenceDiagram
     alt 无 KEY-01（首次启动）
         REPO->>MDF: createDefaultAppState()
         MDF-->>REPO: 6 类设备 + 5 传感器初值 + 4 预置场景 + 空规则/空日志 + 默认设置
-        REPO->>PS: put(KEY-01..KEY-10, json) → flush()
+        REPO->>PS: put(KEY-01) + put(KEY-11) + 9 个分区各写「块头 .hdr + c0000 起分块」→ 一批一次 flush()
     else 已有版本键
-        loop 10 个分区逐区
-            REPO->>PS: getSync(key, '')
-            REPO->>SER: decode(partition, raw)
-            alt 反序列化失败 / 类型不符
+        loop 9 个业务分区逐区（KEY-11 运行时元信息单独读一次）
+            REPO->>PS: getSync(<base>.hdr, '') 读块头得 n
+            REPO->>PS: getSync(<base>.c0000 .. c(n-1), '') 读全部块
+            REPO->>SER: assemblePartition(partition, header, chunks) 校验块数并拼接
+            alt 缺块 / 块头缺失 / 拼接解析失败（多余块不算损坏）
                 SER-->>REPO: 该分区降级默认值 + 系统日志（不崩溃）
             else 成功
                 SER-->>REPO: 分区对象
@@ -153,7 +158,7 @@ sequenceDiagram
         REPO->>MIG: migrate(state, fromVersion)
         alt fromVersion < SCHEMA_VERSION
             MIG->>MIG: migrate_vN_to_vN+1 逐级链式迁移
-            MIG->>PS: put(KEY-01, 新版本号) → flush()
+            MIG->>PS: put(KEY-01, 新版本号)（并入同一批次，不单独 flush）
         end
         MIG-->>REPO: AppState
     end
@@ -173,7 +178,7 @@ sequenceDiagram
     SYS->>EA: 退出应用
     EA->>TH: pause() / release() 清空句柄与回调表
     EA->>REPO: flush()（onWindowStageDestroy / onDestroy）
-    REPO->>PS: put(...) → flush()
+    REPO->>PS: 各 dirty 分区 writeChunks → writeHeader → trimChunks；本批末尾一次 flush()
 
     SYS->>EA: 再次冷启动（重启）
     EA->>REPO: load() 走「已有版本键」分支，不进入首次初始化
