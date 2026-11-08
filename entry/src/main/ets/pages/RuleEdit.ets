@@ -21,7 +21,7 @@ import { validateSensorValue } from '../common/ParamSchema';
 import {
   StateChangeHandler, Unsubscribe, ChangeSet
 } from '../common/StateChangeTypes';
-import { Stage2ServiceFacade } from '../service/ServiceContracts';
+import { ServiceFacade } from '../service/ServiceFacade';
 import { PageHeader } from '../components/common/PageHeader';
 import { SectionCard } from '../components/common/SectionCard';
 import { ToastHost } from '../components/common/ToastHost';
@@ -136,7 +136,7 @@ struct RuleEdit {
 
   private save(): void {
     const rule: AutomationRule = this.buildRule();
-    const facade: Stage2ServiceFacade = Stage2ServiceFacade.getInstance();
+    const facade: ServiceFacade = ServiceFacade.getInstance();
     const task: Promise<CommandResult<AutomationRule>> = this.mode === 'edit'
       ? facade.updateRule(rule)
       : facade.createRule(rule);

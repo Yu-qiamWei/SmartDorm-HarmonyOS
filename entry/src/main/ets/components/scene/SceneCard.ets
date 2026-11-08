@@ -8,7 +8,7 @@ import { CommandResult } from '../../model/CommandResult';
 import { SceneType } from '../../model/Enums';
 import { ThemeTokens } from '../../common/ThemeTokens';
 import { RouteMap } from '../../common/RouteMap';
-import { Stage2ServiceFacade } from '../../service/ServiceContracts';
+import { ServiceFacade } from '../../service/ServiceFacade';
 import { ToastHost } from '../common/ToastHost';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 
@@ -30,7 +30,7 @@ export struct SceneCard {
   @Prop active: boolean = false;
   /** 切换默认实现：调用 MI-14 契约占位，并把执行报告结果数反馈给用户。 */
   onApply: (sceneId: string) => void = (sceneId: string): void => {
-    Stage2ServiceFacade.getInstance().applyScene(sceneId)
+    ServiceFacade.getInstance().applyScene(sceneId)
       .then((report: SceneApplyReport): void => {
         ToastHost.showMessage(
           '场景切换报告：共 ' + report.total + ' 项，成功 ' + report.appliedCount +
@@ -50,7 +50,7 @@ export struct SceneCard {
         return;
       }
       ConfirmDialog.show('删除场景', '确认删除该自定义场景？', (): void => {
-        Stage2ServiceFacade.getInstance().removeScene(sceneId)
+        ServiceFacade.getInstance().removeScene(sceneId)
           .then((result: CommandResult<void>): void => {
             ToastHost.showResult(result);
           });

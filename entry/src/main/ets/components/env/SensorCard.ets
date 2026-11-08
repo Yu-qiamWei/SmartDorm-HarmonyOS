@@ -6,7 +6,7 @@ import { EnvironmentData } from '../../model/EnvironmentData';
 import { CommandResult } from '../../model/CommandResult';
 import { SensorType, EnvSource } from '../../model/Enums';
 import { ThemeTokens } from '../../common/ThemeTokens';
-import { Stage2ServiceFacade } from '../../service/ServiceContracts';
+import { ServiceFacade } from '../../service/ServiceFacade';
 import { ToastHost } from '../common/ToastHost';
 
 @Component
@@ -23,7 +23,7 @@ export struct SensorCard {
   /** 调整默认实现：调用 MI-08 契约占位并 Toast 反馈（越界会返回 INVALID_PARAM）。 */
   onAdjust: (sensorType: SensorType, value: number) => void =
     (sensorType: SensorType, value: number): void => {
-      Stage2ServiceFacade.getInstance()
+      ServiceFacade.getInstance()
         .adjustEnvironment(sensorType, value, EnvSource.MANUAL)
         .then((result: CommandResult<EnvironmentData>): void => {
           ToastHost.showResult<EnvironmentData>(result);

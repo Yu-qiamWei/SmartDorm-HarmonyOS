@@ -20,7 +20,7 @@ import { TimeUtil } from '../common/TimeUtil';
 import {
   StateChangeHandler, Unsubscribe, ChangeSet
 } from '../common/StateChangeTypes';
-import { Stage2ServiceFacade } from '../service/ServiceContracts';
+import { ServiceFacade } from '../service/ServiceFacade';
 import { PageHeader } from '../components/common/PageHeader';
 import { SectionCard } from '../components/common/SectionCard';
 import { LineChart } from '../components/chart/LineChart';
@@ -86,7 +86,7 @@ struct Statistics {
 
   private refresh(): void {
     const state: AppState = AppDataRepository.getInstance().getState();
-    const facade: Stage2ServiceFacade = Stage2ServiceFacade.getInstance();
+    const facade: ServiceFacade = ServiceFacade.getInstance();
     const env: EnvironmentData = state.environment;
     this.operationCount = state.logs.operations.length;
     this.ruleCount = state.logs.ruleExecutions.length;

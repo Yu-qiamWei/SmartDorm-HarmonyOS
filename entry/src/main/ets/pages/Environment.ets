@@ -15,7 +15,7 @@ import { TimeUtil } from '../common/TimeUtil';
 import {
   StateChangeHandler, Unsubscribe, ChangeSet
 } from '../common/StateChangeTypes';
-import { Stage2ServiceFacade } from '../service/ServiceContracts';
+import { ServiceFacade } from '../service/ServiceFacade';
 import { PageHeader } from '../components/common/PageHeader';
 import { SectionCard } from '../components/common/SectionCard';
 import { SensorCard } from '../components/env/SensorCard';
@@ -73,14 +73,14 @@ struct Environment {
       appVersion: settings.appVersion
     };
     const result: CommandResult<AppSettings> =
-      Stage2ServiceFacade.getInstance().updateSettings(updated);
+      ServiceFacade.getInstance().updateSettings(updated);
     this.simulationOn = !this.simulationOn;
     ToastHost.showResult<AppSettings>(result);
   }
 
   private requestEvaluation(): void {
     const snapshot: EnvironmentData = AppDataRepository.getInstance().getState().environment;
-    Stage2ServiceFacade.getInstance().evaluateRules(snapshot)
+    ServiceFacade.getInstance().evaluateRules(snapshot)
       .then((report: RuleEvaluationReport): void => {
         this.lastReport = '报告时间 ' + TimeUtil.format(report.evaluatedAt) +
           ' · 触发 ' + report.triggeredRules.length + ' 条 · 新增日志 ' + report.newLogs.length + ' 条';
@@ -89,7 +89,7 @@ struct Environment {
   }
 
   private manualSample(): void {
-    Stage2ServiceFacade.getInstance()
+    ServiceFacade.getInstance()
       .adjustEnvironment(SensorType.TEMPERATURE, this.temperature, EnvSource.MANUAL)
       .then((result: CommandResult<EnvironmentData>): void => {
         ToastHost.showResult<EnvironmentData>(result);
@@ -212,7 +212,7 @@ struct Environment {
               .backgroundColor(ThemeTokens.PRIMARY)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
               .onClick(() => {
-                Stage2ServiceFacade.getInstance()
+                ServiceFacade.getInstance()
                   .adjustEnvironment(
                     SensorType.HUMAN_PRESENCE,
                     !this.humanPresence,

@@ -21,7 +21,7 @@ import { TimeUtil } from '../common/TimeUtil';
 import {
   StateChangeHandler, Unsubscribe, ChangeSet
 } from '../common/StateChangeTypes';
-import { Stage2ServiceFacade } from '../service/ServiceContracts';
+import { ServiceFacade } from '../service/ServiceFacade';
 import { PageHeader } from '../components/common/PageHeader';
 import { SectionCard } from '../components/common/SectionCard';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -138,7 +138,7 @@ struct DeviceDetail {
   }
 
   private togglePower(): void {
-    Stage2ServiceFacade.getInstance()
+    ServiceFacade.getInstance()
       .setPower(this.deviceId, !this.powerOn, LogActor.USER)
       .then((result: CommandResult<Device>): void => {
         ToastHost.showResult<Device>(result);
@@ -148,7 +148,7 @@ struct DeviceDetail {
   private adjustParam(delta: number): void {
     const key: ParamKey = this.primaryKey();
     const next: number = this.primaryValue + delta;
-    Stage2ServiceFacade.getInstance()
+    ServiceFacade.getInstance()
       .setParam(this.deviceId, key, next, LogActor.USER)
       .then((result: CommandResult<Device>): void => {
         ToastHost.showResult<Device>(result);
@@ -156,7 +156,7 @@ struct DeviceDetail {
   }
 
   private setLock(locked: boolean): void {
-    Stage2ServiceFacade.getInstance()
+    ServiceFacade.getInstance()
       .setParam(this.deviceId, ParamKey.LOCKED, locked, LogActor.USER)
       .then((result: CommandResult<Device>): void => {
         ToastHost.showResult<Device>(result);
@@ -165,7 +165,7 @@ struct DeviceDetail {
 
   private diagnoseStatus(status: DeviceStatus): void {
     this.diagnosticNote = '最近一次诊断：' + status;
-    Stage2ServiceFacade.getInstance()
+    ServiceFacade.getInstance()
       .setDeviceStatus(this.deviceId, status, LogActor.SYSTEM)
       .then((result: CommandResult<Device>): void => {
         ToastHost.showResult<Device>(result);
@@ -174,7 +174,7 @@ struct DeviceDetail {
 
   private diagnoseOnline(online: boolean): void {
     this.diagnosticNote = '最近一次诊断：online=' + online;
-    Stage2ServiceFacade.getInstance()
+    ServiceFacade.getInstance()
       .setOnline(this.deviceId, online, LogActor.SYSTEM)
       .then((result: CommandResult<Device>): void => {
         ToastHost.showResult<Device>(result);

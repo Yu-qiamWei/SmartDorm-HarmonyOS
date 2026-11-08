@@ -17,7 +17,7 @@ import { TimeUtil } from '../common/TimeUtil';
 import {
   StateChangeHandler, Unsubscribe, ChangeSet
 } from '../common/StateChangeTypes';
-import { Stage2ServiceFacade } from '../service/ServiceContracts';
+import { ServiceFacade } from '../service/ServiceFacade';
 import { PageHeader } from '../components/common/PageHeader';
 import { SectionCard } from '../components/common/SectionCard';
 import { ToastHost } from '../components/common/ToastHost';
@@ -110,7 +110,7 @@ struct SceneEdit {
   }
 
   private save(): void {
-    const facade: Stage2ServiceFacade = Stage2ServiceFacade.getInstance();
+    const facade: ServiceFacade = ServiceFacade.getInstance();
     if (this.mode === 'edit') {
       facade.updateScene(this.buildScene())
         .then((result: CommandResult<Scene>): void => {

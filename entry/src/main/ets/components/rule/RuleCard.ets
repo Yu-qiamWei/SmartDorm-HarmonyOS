@@ -7,7 +7,7 @@ import { CommandResult } from '../../model/CommandResult';
 import { ConditionLogic } from '../../model/Enums';
 import { ThemeTokens } from '../../common/ThemeTokens';
 import { RouteMap } from '../../common/RouteMap';
-import { Stage2ServiceFacade } from '../../service/ServiceContracts';
+import { ServiceFacade } from '../../service/ServiceFacade';
 import { ToastHost } from '../common/ToastHost';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 
@@ -33,7 +33,7 @@ export struct RuleCard {
   /** 启停默认实现：调用 MI-11 契约占位并 Toast 反馈。 */
   onToggle: (ruleId: string, enabled: boolean) => void =
     (ruleId: string, enabled: boolean): void => {
-      Stage2ServiceFacade.getInstance().toggleRule(ruleId, enabled)
+      ServiceFacade.getInstance().toggleRule(ruleId, enabled)
         .then((result: CommandResult<AutomationRule>): void => {
           ToastHost.showResult<AutomationRule>(result);
         });
@@ -45,7 +45,7 @@ export struct RuleCard {
   /** 删除默认实现：二次确认 → MI-11 契约占位 → Toast。 */
   onDelete: (ruleId: string) => void = (ruleId: string): void => {
     ConfirmDialog.show('删除规则', '确认删除该规则？删除后不再参与求值。', (): void => {
-      Stage2ServiceFacade.getInstance().removeRule(ruleId)
+      ServiceFacade.getInstance().removeRule(ruleId)
         .then((result: CommandResult<void>): void => {
           ToastHost.showResult(result);
         });

@@ -12,7 +12,7 @@ import { RouteMap } from '../common/RouteMap';
 import {
   StateChangeHandler, Unsubscribe, ChangeSet
 } from '../common/StateChangeTypes';
-import { Stage2ServiceFacade } from '../service/ServiceContracts';
+import { ServiceFacade } from '../service/ServiceFacade';
 import { PageHeader } from '../components/common/PageHeader';
 import { SectionCard } from '../components/common/SectionCard';
 import { DeviceCard } from '../components/device/DeviceCard';
@@ -76,7 +76,7 @@ struct DeviceList {
   }
 
   private addDevice(): void {
-    Stage2ServiceFacade.getInstance()
+    ServiceFacade.getInstance()
       .addDevice(this.selectedType, '新' + this.selectedType + '设备')
       .then((result: CommandResult<Device>): void => {
         ToastHost.showResult<Device>(result);
@@ -85,7 +85,7 @@ struct DeviceList {
 
   private removeDevice(device: Device): void {
     ConfirmDialog.show('删除设备', '确认删除「' + device.name + '」？', (): void => {
-      Stage2ServiceFacade.getInstance().removeDevice(device.id)
+      ServiceFacade.getInstance().removeDevice(device.id)
         .then((result: CommandResult<void>): void => {
           ToastHost.showResult(result);
         });

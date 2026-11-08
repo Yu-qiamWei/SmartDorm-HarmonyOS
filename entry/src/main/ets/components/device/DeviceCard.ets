@@ -8,7 +8,7 @@ import { DeviceStatus, DeviceType, LogActor } from '../../model/Enums';
 import { DeviceParamsFactory } from '../../model/DeviceParams';
 import { ThemeTokens } from '../../common/ThemeTokens';
 import { RouteMap } from '../../common/RouteMap';
-import { Stage2ServiceFacade } from '../../service/ServiceContracts';
+import { ServiceFacade } from '../../service/ServiceFacade';
 import { ToastHost } from '../common/ToastHost';
 import { StatusBadge } from '../common/StatusBadge';
 
@@ -36,7 +36,7 @@ export struct DeviceCard {
   /** 快速开关默认实现：调用 MI-02 契约占位并用 Toast 反馈 CommandResult。 */
   onQuickToggle: (deviceId: string, on: boolean) => void =
     (deviceId: string, on: boolean): void => {
-      Stage2ServiceFacade.getInstance().setPower(deviceId, on, LogActor.USER)
+      ServiceFacade.getInstance().setPower(deviceId, on, LogActor.USER)
         .then((result: CommandResult<Device>): void => {
           ToastHost.showResult<Device>(result);
         });

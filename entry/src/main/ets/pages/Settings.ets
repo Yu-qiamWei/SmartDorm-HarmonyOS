@@ -9,11 +9,11 @@ import { CommandResult } from '../model/CommandResult';
 import { ResetScope } from '../model/Enums';
 import { AppDataRepository } from '../store/AppDataRepository';
 import { ThemeTokens } from '../common/ThemeTokens';
-import { APP_VERSION, SCHEMA_VERSION } from '../common/Constants';
+import { APP_VERSION, DEFAULT_LOG_LIMIT, DEFAULT_SAMPLE_INTERVAL_MS, SCHEMA_VERSION } from '../common/Constants';
 import {
   StateChangeHandler, Unsubscribe, ChangeSet
 } from '../common/StateChangeTypes';
-import { Stage2ServiceFacade } from '../service/ServiceContracts';
+import { ServiceFacade } from '../service/ServiceFacade';
 import { PageHeader } from '../components/common/PageHeader';
 import { SectionCard } from '../components/common/SectionCard';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
@@ -24,8 +24,9 @@ import { ToastHost } from '../components/common/ToastHost';
 struct Settings {
   @State automationOn: boolean = true;
   @State simulationOn: boolean = true;
-  @State sampleInterval: number = 4000;
-  @State logLimit: number = 1000;
+  /** 初值取工程级常量（NFR-05），不在页面里写死裸数字。 */
+  @State sampleInterval: number = DEFAULT_SAMPLE_INTERVAL_MS;
+  @State logLimit: number = DEFAULT_LOG_LIMIT;
   @State subscriberCount: number = 0;
   @State exportNote: string = '尚未导出';
   @State flushNote: string = '尚未手动保存';
@@ -71,7 +72,7 @@ struct Settings {
       appVersion: current.appVersion
     };
     const result: CommandResult<AppSettings> =
-      Stage2ServiceFacade.getInstance().updateSettings(updated);
+      ServiceFacade.getInstance().updateSettings(updated);
     this.automationOn = automation;
     this.simulationOn = simulation;
     this.sampleInterval = interval;
@@ -84,7 +85,7 @@ struct Settings {
       '重置全部数据',
       '将恢复默认设备 / 规则 / 场景 / 设置 / 日志。阶段二为接口占位，不会真实写入。',
       (): void => {
-        Stage2ServiceFacade.getInstance().resetData(ResetScope.ALL)
+        ServiceFacade.getInstance().resetData(ResetScope.ALL)
           .then((result: CommandResult<AppState>): void => {
             ToastHost.showResult<AppState>(result);
           });
@@ -93,7 +94,7 @@ struct Settings {
   }
 
   private manualFlush(): void {
-    Stage2ServiceFacade.getInstance().flush()
+    ServiceFacade.getInstance().flush()
       .then((result: CommandResult<void>): void => {
         this.flushNote = '手动保存请求结果：' + result.code;
         ToastHost.showResult(result);
@@ -103,7 +104,7 @@ struct Settings {
   private exportState(): void {
     const state: AppState = AppDataRepository.getInstance().getState();
     const result: CommandResult<string> =
-      Stage2ServiceFacade.getInstance().exportState(state, 'json');
+      ServiceFacade.getInstance().exportState(state, 'json');
     this.exportNote = '导出请求结果：' + result.code + ' · ' + result.message;
     ToastHost.showResult<string>(result);
   }
