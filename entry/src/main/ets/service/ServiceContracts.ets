@@ -79,17 +79,21 @@ export interface IRuleEngine {
   evaluate(snapshot: EnvironmentData): Promise<RuleEvaluationReport>;
 }
 
-/** MI-14：场景应用，返回逐设备执行报告。 */
+/** MI-14：场景应用，返回逐设备执行报告。实现：`SceneService`。 */
 export interface ISceneService {
   apply(sceneId: string): Promise<SceneApplyReport>;
+  create(name: string): Promise<CommandResult<Scene>>;
+  update(scene: Scene): Promise<CommandResult<Scene>>;
+  remove(sceneId: string): Promise<CommandResult<void>>;
 }
 
-/** MI-13 相关：图表数据聚合（数据必须来自真实日志）。 */
-export interface IStatisticsService {
-  buildLineModel(logs: EnvironmentLog[], sensorType: SensorType): LineChartModel;
-  buildBarModel(logs: OperationLog[], groupBy: string): BarChartModel;
-  successRate(logs: RuleExecutionLog[]): number;
-}
+/**
+ * MI-13 相关：图表数据聚合（数据必须来自真实日志）。实现：`StatisticsService`。
+ * ★ 契约本体已抽出到 `service/StatisticsContract.ets`（零 `@kit.*` 依赖），此处 re-export
+ *   仅为保持既有 import 路径可用。原因见该文件头注释：
+ *   ArkTS 不支持结构化类型 + `StatisticsService` 必须保持 L2 可测（零 Kit）。
+ */
+export { IStatisticsService } from './StatisticsContract';
 
 /** MI-13：四类日志查询与三类 append（★ 不暴露规则日志写入，护栏 A-1）。实现：`LogService`。 */
 export interface ILogService {
