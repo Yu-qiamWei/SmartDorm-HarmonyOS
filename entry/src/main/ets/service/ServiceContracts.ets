@@ -64,15 +64,17 @@ export interface IEnvironmentService {
   adjust(sensorType: SensorType, value: number | boolean, source: EnvSource): Promise<CommandResult<EnvironmentData>>;
 }
 
-/** MI-11：规则 CRUD / 启停，编辑后须 resetDedup()。 */
+/** MI-11：规则 CRUD / 启停，编辑后须 resetDedup()。实现：`RuleService`。 */
 export interface IRuleService {
   create(rule: AutomationRule): Promise<CommandResult<AutomationRule>>;
   update(rule: AutomationRule): Promise<CommandResult<AutomationRule>>;
   remove(id: string): Promise<CommandResult<void>>;
   toggle(id: string, enabled: boolean): Promise<CommandResult<AutomationRule>>;
+  /** 总开关切换时统一复位全部规则的去重标记（FR-04-10 配套）。 */
+  resetAllDedup(): void;
 }
 
-/** MI-12：规则求值核心（唯一可写 RuleExecutionLog）。 */
+/** MI-12：规则求值核心（唯一可写 RuleExecutionLog）。实现：`RuleEngine`。 */
 export interface IRuleEngine {
   evaluate(snapshot: EnvironmentData): Promise<RuleEvaluationReport>;
 }

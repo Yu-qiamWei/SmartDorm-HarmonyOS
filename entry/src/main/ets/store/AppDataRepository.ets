@@ -181,7 +181,7 @@ export class AppDataRepository implements IAppDataRepository, IStateWriter {
       this.state.logs.ruleExecutions.concat(report.newLogs);
     this.state.logs.ruleExecutions = Fifo.trim(merged, limit);
     this.markDirty(StoragePartition.RULE_EXEC_LOGS);
-    this.notify('log-rule-execution', [StoragePartition.RULE_EXEC_LOGS]);
+    this.notify('rule-logs', [StoragePartition.RULE_EXEC_LOGS]);
     return AppDataRepository.voidResult(
       ResultCode.OK,
       '新增 ' + report.newLogs.length + ' 条执行日志，上限 ' + limit,
