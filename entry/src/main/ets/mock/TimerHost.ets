@@ -1,11 +1,11 @@
 /**
  * 智寓 · TimerHost 定时任务全局单例（MI-10 / FR-03-07 / NFR-04 / 核验清单第 24 项）
  *
- * 阶段二骨架：唯一 number 句柄，register / release / pause / resume 签名齐全；
- * 页面只订阅、不注册定时器（SK-01~SK-04，TC-E-08 骨架级保证）。
- * ★ 本阶段不启动真实环境采样：configure() 默认 simulationEnabled=false，
- *   resume() 依该开关决定是否 setInterval；tick() 只做内部计数，不产生业务结果。
- *   ST-03 接 EnvironmentSimulator.tick() 与真实波动逻辑。
+ * 唯一 `number` 句柄，register / release / pause / resume / tick 均已实现；
+ * 页面只订阅、不注册定时器（SK-01~SK-04，TC-E-08）。
+ * ★ 阶段三：`tick()` 真实遍历回调表并驱动业务回调（环境采样链路），
+ *   但**仍只有 1 个 setInterval 句柄**——`resume()` 内 `this.handle === -1` 判定保证。
+ *   是否运行由 `configure(simulationEnabled, intervalMs)` 决定，取自 `settings`。
  */
 import { IdGenerator } from '../common/IdGenerator';
 import { DEFAULT_SAMPLE_INTERVAL_MS } from '../common/Constants';
@@ -29,7 +29,7 @@ export class TimerHost {
   private constructor() {
   }
 
-  /** 由 EntryAbility 注入当前设置（阶段二固定 false，不启动真实采样）。 */
+  /** 由 EntryAbility 按 `settings` 注入：模拟开关 + 采样间隔（间隔非法时回退默认 4000ms）。 */
   configure(simulationEnabled: boolean, intervalMs: number): void {
     this.simulationEnabled = simulationEnabled;
     this.intervalMs = intervalMs > 0 ? intervalMs : DEFAULT_SAMPLE_INTERVAL_MS;
@@ -86,13 +86,19 @@ export class TimerHost {
   }
 
   /**
-   * 单步 tick：阶段二只累计内部计数（不波动环境、不写日志、不通知 UI）。
-   * TODO(ST-03): 接 EnvironmentSimulator.tick() → EnvironmentService.adjust() → RuleEngine。
+   * 单步 tick：累计计数 + **真实驱动**已注册回调（阶段三 T3-02 接通）。
+   * 先对回调表做快照再遍历，避免回调内部 register / release 造成遍历期间集合变动。
+   * 定时器唯一性仍由 resume() 保证：全工程只有 1 个 setInterval 句柄（B8）。
    */
   tick(): void {
     this.ticks = this.ticks + 1;
-    // TODO(ST-03): 在此遍历 this.callbacks 并驱动 EnvironmentSimulator.tick()。
-    // 阶段二刻意不执行业务回调，避免产生「看起来像真执行」的效果。
+    const snapshot: (() => void)[] = [];
+    this.callbacks.forEach((callback: () => void): void => {
+      snapshot.push(callback);
+    });
+    for (let i = 0; i < snapshot.length; i++) {
+      snapshot[i]();
+    }
   }
 
   /** 诊断：当前定时器句柄（字符串），未注册时返回空串。 */
@@ -105,7 +111,7 @@ export class TimerHost {
     return this.handle !== -1;
   }
 
-  /** 诊断：tick 累计次数（阶段二恒为 0，因为默认不启动采样）。 */
+  /** 诊断：tick 累计次数（未启动采样时恒为 0）。 */
   tickCount(): number {
     return this.ticks;
   }
