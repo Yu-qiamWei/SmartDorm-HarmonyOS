@@ -1,9 +1,22 @@
 %% 智寓——HarmonyOS 智能宿舍管家 · 类图（对应报告表 2.1 / 3.1 / 3.2）
-%% 来源：design/系统架构设计.md 第 5 章；可直接在 Mermaid 编辑器中渲染与修改。
+%% 来源：design/系统架构设计.md 第 5 章（设计基线）+ 阶段二已提交代码的**实际字段与签名**（2026-11-09 同步）
+%%
+%% 【同步状态】本文件字段与签名以「已提交代码」为准；`系统架构设计.md` 第 5 章保留设计基线版，两者若有差异以本文件反映的代码现状为准。
+%%   · 已落地（阶段二，提交 3d3db9b / 8cb7ee4）：model/ 全部类型、AppDataRepository（内存态占位）、TimerHost（骨架）、EntryAbility（六钩子）、
+%%     ServiceContracts 的 7 个 interface + commandToParamKey、MockDataFactory、PreferencesOptions、StorageKeys
+%%   · 未落地（阶段三，见 design/任务列表-第三阶段.md）：各 Service 实现、RuleEngine、WriteGuard、RuleActionExecutor、
+%%     LogService、MockDeviceAdapter、EnvironmentSimulator、StatisticsService、SceneService、ExportService
+%%   · 未落地（阶段四）：PreferencesStore、Serializer、SchemaMigration、WriteQueue
+%% 标注约定：类内 `<<阶段三>>` / `<<阶段四>>` = 尚未实现；无标注 = 已提交代码中存在
 %% 关系说明：*-- 聚合 / --> 依赖调用 / ..> 使用或产出 / ..|> 实现
+%% 类型说明：Mermaid classDiagram 的 ~T~ 不支持嵌套，故 Promise<CommandResult<T>> 统一简写为 Promise~CommandResult~；
+%%           WriteGuard.written 语义为 Map<string, Set<string>>（设计 B-3），图中简写为 Map~string, string[]~
+%%           FIFO 归属：LogService.trimFifo 为设计期归属表示；阶段三派单（T3-01/C5）把实际淘汰点下沉到
+%%           AppDataRepository.append*Log（仓储持有数组），语义一致、执行点不同，尚待主理人统一口径
 classDiagram
     direction TB
 
+    %% ——————————————— 枚举（model/Enums.ets 已落地，16 个）———————————————
     class DeviceType {
         <<enumeration>>
         LIGHT
@@ -19,6 +32,88 @@ classDiagram
         IDLE
         FAULT
         OFFLINE
+    }
+    class DeviceCommand {
+        <<enumeration>>
+        POWER_ON
+        POWER_OFF
+        SET_BRIGHTNESS
+        SET_TEMPERATURE
+        SET_MODE
+        SET_OPEN_PERCENT
+        LOCK
+        UNLOCK
+        SET_FAN_SPEED
+        SET_POWER
+        SOCKET_ON
+        SOCKET_OFF
+    }
+    class SensorType {
+        <<enumeration>>
+        TEMPERATURE
+        HUMIDITY
+        ILLUMINANCE
+        AIR_QUALITY
+        HUMAN_PRESENCE
+    }
+    class Operator {
+        <<enumeration>>
+        GT
+        LT
+        IS_TRUE
+        IS_FALSE
+    }
+    class ConditionLogic {
+        <<enumeration>>
+        AND
+    }
+    class SceneType {
+        <<enumeration>>
+        STUDY
+        SLEEP
+        AWAY
+        RETURN
+        CUSTOM
+    }
+    class RunMode {
+        <<enumeration>>
+        STUDY
+        SLEEP
+        AWAY
+        RETURN
+        CUSTOM
+        MANUAL
+    }
+    class LogActor {
+        <<enumeration>>
+        USER
+        RULE
+        SCENE
+        SYSTEM
+    }
+    class EnvSource {
+        <<enumeration>>
+        MANUAL
+        SIMULATED
+        INIT
+    }
+    class ACMode {
+        <<enumeration>>
+        COOL
+        HEAT
+        FAN
+        DRY
+        AUTO
+    }
+    class ParamKey {
+        <<enumeration>>
+        BRIGHTNESS
+        TEMPERATURE
+        MODE
+        OPEN_PERCENT
+        LOCKED
+        FAN_SPEED
+        POWER_WATT
     }
     class ResultCode {
         <<enumeration>>
@@ -40,7 +135,20 @@ classDiagram
         SKIPPED_CONFLICT
         SKIPPED_DISABLED
     }
+    class ResetScope {
+        <<enumeration>>
+        ALL
+        LOGS_ONLY
+    }
+    class LogType {
+        <<enumeration>>
+        OPERATION
+        RULE_EXECUTION
+        ENVIRONMENT
+        SCENE_SWITCH
+    }
 
+    %% ——————————————— 数据模型（model/ 已落地）———————————————
     class DeviceParams {
         <<union>>
         LightParams
@@ -49,6 +157,11 @@ classDiagram
         DoorLockParams
         FanParams
         SocketParams
+    }
+    class DeviceParamsFactory {
+        +defaults(type) DeviceParams
+        +paramKeysOf(type) ParamKey[]
+        +describe(params) string
     }
     class Device {
         +string id
@@ -61,6 +174,12 @@ classDiagram
         +boolean locked
         +number createdAt
         +number lastUpdated
+    }
+    class DeviceStatusView {
+        +DeviceStatus status
+        +string label
+        +string color
+        +string background
     }
     class EnvironmentData {
         +number temperature
@@ -104,6 +223,8 @@ classDiagram
         +boolean powerOn
         +DeviceParams params
         +boolean locked
+        +boolean online
+        +DeviceStatus status
         +number capturedAt
     }
     class Scene {
@@ -113,11 +234,43 @@ classDiagram
         +DeviceStateSnapshot[] deviceStates
         +boolean isPreset
         +DeviceStateSnapshot[] returnSnapshot
+        +number createdAt
+        +number updatedAt
+    }
+    class AppSettings {
+        +boolean automationEnabled
+        +boolean simulationEnabled
+        +number sampleIntervalMs
+        +number logLimit
+        +number schemaVersion
+        +string appVersion
+    }
+
+    %% ——————————————— 日志（model/Logs.ets 已落地）———————————————
+    class OperationLog {
+        +string id
+        +number timestamp
+        +LogActor actor
+        +string deviceId
+        +string action
+        +string before
+        +string after
+        +ResultCode result
+        +string message
+    }
+    class ActionExecutionDetail {
+        +string actionId
+        +string targetDeviceId
+        +string command
+        +string value
+        +ResultCode result
+        +string message
     }
     class RuleExecutionLog {
         +string id
         +number timestamp
         +string ruleId
+        +string ruleName
         +EnvironmentData snapshot
         +AutomationCondition[] matchedConditions
         +ActionExecutionDetail[] executedActions
@@ -126,19 +279,30 @@ classDiagram
         +string errorMsg
         +number durationMs
     }
-    class OperationLog {
+    class EnvironmentLog {
         +string id
-        +LogActor actor
-        +string deviceId
-        +ResultCode result
+        +number timestamp
+        +SensorType sensorType
+        +number|boolean before
+        +number|boolean after
+        +EnvSource source
     }
-    class AppSettings {
-        +boolean automationEnabled
-        +boolean simulationEnabled
-        +number sampleIntervalMs
-        +number logLimit
-        +number schemaVersion
+    class SceneSwitchLog {
+        +string id
+        +number timestamp
+        +string fromSceneId
+        +string toSceneId
+        +number appliedCount
+        +number failedCount
     }
+    class LogBundle {
+        +OperationLog[] operations
+        +RuleExecutionLog[] ruleExecutions
+        +EnvironmentLog[] environment
+        +SceneSwitchLog[] sceneSwitches
+    }
+
+    %% ——————————————— 顶层状态与补充类型 ———————————————
     class AppState {
         +number schemaVersion
         +Device[] devices
@@ -149,6 +313,7 @@ classDiagram
         +LogBundle logs
         +DeviceStateSnapshot[] returnSnapshot
         +RunMode currentMode
+        +string currentSceneId
     }
     class CommandResult~T~ {
         +boolean success
@@ -158,35 +323,90 @@ classDiagram
         +T data
         +number timestamp
     }
+    class ActionOutcome {
+        +string actionId
+        +string deviceId
+        +string command
+        +string paramKey
+        +ResultCode code
+        +string message
+    }
+    class RuleOutcome {
+        +string ruleId
+        +string ruleName
+        +boolean satisfied
+        +RuleExecStatus status
+        +ActionOutcome[] actionOutcomes
+        +string errorMsg
+    }
     class RuleEvaluationReport {
         +number evaluatedAt
         +EnvironmentData snapshot
+        +boolean automationEnabled
         +string skipReason
+        +number totalRules
+        +string[] triggeredRules
+        +string[] skippedDedupRules
+        +string[] skippedConflictRules
         +RuleOutcome[] outcomes
         +RuleExecutionLog[] newLogs
         +number durationMs
     }
+    class SceneApplyItem {
+        +string deviceId
+        +ResultCode code
+        +string message
+    }
     class SceneApplyReport {
         +string sceneId
+        +string sceneName
+        +string fromSceneId
+        +number appliedAt
+        +number total
         +number appliedCount
         +number failedCount
+        +number noChangeCount
+        +SceneApplyItem[] items
         +boolean restoredFromSnapshot
     }
 
+    %% ——————————————— 契约（store/ 已落地）———————————————
+    class IAppDataRepository {
+        <<interface>>
+        +load() AppState
+        +flush(partition) Promise~CommandResult~
+        +reset(scope) Promise~CommandResult~
+        +subscribe(handler) Unsubscribe
+        +getState() AppState
+        +listDevices() Device[]
+        +commitRuleLogs(report) Promise~CommandResult~
+    }
+    class PreferencesOptions {
+        +string name
+        +string dataGroupId
+        +defaultPreferencesOptions() PreferencesOptions
+        +toSdkOptions(o) preferences.Options
+    }
+
+    %% ——————————————— 存储层 ———————————————
     class AppDataRepository {
         -AppState state
-        -Map~string, StateChangeHandler~ subscribers
-        -WriteQueue queue
+        -Map~string, StateChangeHandler~ handlers
         +load() AppState
-        +flush(partition) Promise~CommandResult~void~~
-        +reset(scope) Promise~CommandResult~AppState~~
-        +subscribe(handler) Unsubscribe
-        +listDevices() Device[]
         +getState() AppState
-        +commitRuleLogs(report) Promise~CommandResult~void~~
-        -notify(change) void
+        +listDevices() Device[]
+        +findDevice(id) Device|undefined
+        +findRule(id) AutomationRule|undefined
+        +findScene(id) Scene|undefined
+        +subscribe(handler) Unsubscribe
+        +notify(reason, partitions) void
+        +subscriberCount() number
+        +flush(partition) Promise~CommandResult~
+        +reset(scope) Promise~CommandResult~
+        +commitRuleLogs(report) Promise~CommandResult~
     }
     class PreferencesStore {
+        <<阶段四>>
         -preferences.Preferences pref
         +init(context) void
         +get(key, defValue) string
@@ -197,62 +417,131 @@ classDiagram
         +flush() Promise~void~
     }
     class Serializer {
+        <<阶段四>>
         +encode(state) Record~string, string~
         +decode(partition, raw) AppState
     }
     class SchemaMigration {
+        <<阶段四>>
         +SCHEMA_VERSION number
         +migrate(raw, fromVersion) AppState
     }
     class WriteQueue {
+        <<阶段四>>
         -Promise~void~ tail
         +enqueue(task) Promise~void~
     }
 
+    %% ——————————————— 业务层（阶段三实现，接口已在 ServiceContracts 落地）———————————————
+    class IDeviceService {
+        <<interface>>
+        +setPower(id, on, actor)
+        +setParam(id, key, value, actor)
+        +addDevice(type, name)
+        +removeDevice(id)
+        +setDeviceStatus(id, status, actor)
+        +setOnline(id, online, actor)
+    }
+    class IEnvironmentService {
+        <<interface>>
+        +getSnapshot() EnvironmentData
+        +adjust(sensorType, value, source)
+    }
+    class IRuleService {
+        <<interface>>
+        +create(rule)
+        +update(rule)
+        +remove(id)
+        +toggle(id, enabled)
+    }
+    class IRuleEngine {
+        <<interface>>
+        +evaluate(snapshot) Promise~RuleEvaluationReport~
+    }
+    class ISceneService {
+        <<interface>>
+        +apply(sceneId) Promise~SceneApplyReport~
+    }
+    class ILogService {
+        <<interface>>
+        +query(filter) LogRecord[]
+        +appendOperation(log) void
+        +appendEnvironment(log) void
+        +appendSceneSwitch(log) void
+    }
+    class IStatisticsService {
+        <<interface>>
+        +buildLineModel(logs, sensorType) LineChartModel
+        +buildBarModel(logs, groupBy) BarChartModel
+        +successRate(logs) number
+    }
+    class IExportService {
+        <<interface>>
+        +exportToFilesDir(state, format) CommandResult~string~
+    }
+
     class DeviceService {
-        +setPower(id, on, actor) Promise~CommandResult~Device~~
-        +setParam(id, key, value, actor) Promise~CommandResult~Device~~
-        +addDevice(type, name) Promise~CommandResult~Device~~
-        +removeDevice(id) Promise~CommandResult~void~~
-        -validate(device, key, value) ResultCode
+        <<阶段三>>
+        +setPower(id, on, actor) Promise~CommandResult~
+        +setParam(id, key, value, actor) Promise~CommandResult~
+        +addDevice(type, name) Promise~CommandResult~
+        +removeDevice(id) Promise~CommandResult~
+        +setDeviceStatus(id, status, actor) Promise~CommandResult~
+        +setOnline(id, online, actor) Promise~CommandResult~
+        -validateChain(id, key, value) ResultCode
     }
     class EnvironmentService {
+        <<阶段三>>
         +getSnapshot() EnvironmentData
-        +adjust(sensorType, value, source) Promise~CommandResult~EnvironmentData~~
+        +adjust(sensorType, value, source) Promise~CommandResult~
+        +applySampled(next) Promise~void~
+        +setEvaluationTrigger(trigger) void
     }
     class RuleService {
-        +create(rule) Promise~CommandResult~AutomationRule~~
-        +update(rule) Promise~CommandResult~AutomationRule~~
-        +remove(id) Promise~CommandResult~void~~
-        +toggle(id, enabled) Promise~CommandResult~AutomationRule~~
-        -resetDedup(ruleId) void
+        <<阶段三>>
+        +create(rule) Promise~CommandResult~
+        +update(rule) Promise~CommandResult~
+        +remove(id) Promise~CommandResult~
+        +toggle(id, enabled) Promise~CommandResult~
+        +resetAllDedup() void
     }
     class RuleEngine {
-        -Map~string, boolean~ dedup
+        <<阶段三>>
         +evaluate(snapshot) Promise~RuleEvaluationReport~
         -sortRules(rules) AutomationRule[]
         -evalConditions(rule, snapshot) boolean
         -buildExecutionLog(outcome) RuleExecutionLog
     }
     class RuleActionExecutor {
-        +execute(action, guard, actor) Promise~ActionOutcome~
-        -commandToParamKey(command) ParamKey
+        <<阶段三>>
+        +execute(action, guard, ruleId) Promise~ActionOutcome~
     }
     class WriteGuard {
-        -Map~string, Set~string~~ written
-        +claim(deviceId, paramKey, ruleId) boolean
+        <<阶段三>>
+        -Map~string, string[]~ written
         +reset() void
+        +claim(deviceId, paramKey, ruleId) boolean
+        +has(deviceId, paramKey) boolean
+        +entries() GuardEntry[]
+        +size() number
     }
     class SceneService {
+        <<阶段三>>
         +apply(sceneId) Promise~SceneApplyReport~
+        +create(name) Promise~CommandResult~
+        +update(scene) Promise~CommandResult~
+        +remove(sceneId) Promise~CommandResult~
         -captureSnapshot() DeviceStateSnapshot[]
     }
     class StatisticsService {
+        <<阶段三>>
         +buildLineModel(logs, sensorType) LineChartModel
         +buildBarModel(logs, groupBy) BarChartModel
         +successRate(logs) number
+        +averageDuration(logs) number
     }
     class LogService {
+        <<阶段三>>
         +query(filter) LogRecord[]
         +appendOperation(log) void
         +appendEnvironment(log) void
@@ -260,26 +549,54 @@ classDiagram
         -trimFifo(bundle) void
     }
     class ExportService {
+        <<阶段三>>
+        +init(context) void
         +exportToFilesDir(state, format) CommandResult~string~
     }
 
+    %% ——————————————— Mock 与入口 ———————————————
     class MockDeviceAdapter {
+        <<阶段三>>
         +apply(command) CommandResult~Device~
         +setDeviceStatus(id, status) CommandResult~Device~
         +setOnline(id, online) CommandResult~Device~
     }
     class EnvironmentSimulator {
+        <<阶段三>>
         +start(intervalMs) void
         +stop() void
-        +tick() void
+        +tick() EnvironmentData
+        +nextReading(current, rnd, now) EnvironmentData
+    }
+    class MockDataFactory {
+        +createDefaultAppState() AppState
+        +createDefaultDevices(now) Device[]
+        +createDefaultEnvironment(now) EnvironmentData
+        +createDefaultSettings() AppSettings
+        +createPresetScenes(devices, now) Scene[]
+        +createCustomScene(name, devices, now) Scene
+        +buildTargetStates(devices, sceneType, now) DeviceStateSnapshot[]
+        +targetPower(type, sceneType) boolean
+        +targetLocked(sceneType) boolean
     }
     class TimerHost {
         -number handle
-        -Map~string, TimerCallback~ callbacks
+        -string registeredHandle
+        -Map~string, function~ callbacks
+        -number intervalMs
+        -boolean simulationEnabled
+        -boolean paused
+        -number ticks
+        +configure(simulationEnabled, intervalMs) void
         +register(cb, intervalMs) string
         +release(handle) void
         +pause() void
         +resume() void
+        +tick() void
+        +currentHandle() string
+        +isRunning() boolean
+        +tickCount() number
+        +callbackCount() number
     }
     class EntryAbility {
         +onCreate(want, launchParam) void
@@ -290,46 +607,90 @@ classDiagram
         +onDestroy() void
     }
 
+    %% ——————————————— 关系 ———————————————
     AppState *-- Device : 聚合 devices
     AppState *-- AutomationRule : 聚合 rules
     AppState *-- Scene : 聚合 scenes
     AppState *-- AppSettings : 聚合 settings
     AppState *-- EnvironmentData : 聚合 environment
-    Device *-- DeviceParams : params
+    AppState *-- LogBundle : 聚合 logs
+    AppState *-- DeviceStateSnapshot : 聚合 returnSnapshot（KEY-10）
+
+    Device *-- DeviceParams : params（kind 与 type 必须一致 AT-04）
     Device ..> DeviceType : 使用
     Device ..> DeviceStatus : 使用
+    DeviceParamsFactory ..> DeviceParams : 生成默认值
+    DeviceParamsFactory ..> ParamKey : paramKeysOf
+
     AutomationRule *-- AutomationCondition : conditions
     AutomationRule *-- AutomationAction : actions
-    Scene *-- DeviceStateSnapshot : deviceStates / returnSnapshot
-    RuleExecutionLog ..> RuleExecStatus : 使用
-    CommandResult~T~ ..> ResultCode : 使用
+    AutomationRule ..> ConditionLogic : 使用（P0 固定 AND）
+    AutomationCondition ..> SensorType : 使用
+    AutomationCondition ..> Operator : 使用
+    AutomationAction ..> DeviceCommand : 使用
 
+    Scene *-- DeviceStateSnapshot : deviceStates / returnSnapshot
+    Scene ..> SceneType : 使用
+    DeviceStateSnapshot *-- DeviceParams : params
+
+    LogBundle *-- OperationLog : operations
+    LogBundle *-- RuleExecutionLog : ruleExecutions
+    LogBundle *-- EnvironmentLog : environment
+    LogBundle *-- SceneSwitchLog : sceneSwitches
+    OperationLog ..> LogActor : 使用
+    OperationLog ..> ResultCode : 使用
+    EnvironmentLog ..> SensorType : 使用
+    EnvironmentLog ..> EnvSource : 使用
+    RuleExecutionLog *-- ActionExecutionDetail : executedActions / skippedActions
+    RuleExecutionLog ..> RuleExecStatus : 使用
+    RuleExecutionLog ..> AutomationCondition : matchedConditions
+
+    CommandResult~T~ ..> ResultCode : 使用
+    RuleEvaluationReport *-- RuleOutcome : outcomes
+    RuleEvaluationReport *-- RuleExecutionLog : newLogs（护栏 A-3）
+    RuleOutcome *-- ActionOutcome : actionOutcomes
+    SceneApplyReport *-- SceneApplyItem : items
+
+    AppDataRepository ..|> IAppDataRepository : 实现
     AppDataRepository *-- AppState : 单一数据源
-    AppDataRepository *-- WriteQueue : 串行写
-    AppDataRepository --> PreferencesStore : MI-19
-    AppDataRepository --> Serializer : 编解码
-    AppDataRepository --> SchemaMigration : 版本迁移
+    AppDataRepository --> PreferencesStore : MI-19（阶段四）
+    AppDataRepository --> Serializer : 编解码（阶段四）
+    AppDataRepository --> SchemaMigration : 版本迁移（阶段四）
+    AppDataRepository *-- WriteQueue : 串行写（阶段四）
     PreferencesStore ..> PreferencesOptions : 包装 SDK Options
 
-    DeviceService --> AppDataRepository : 读写内存态
+    DeviceService ..|> IDeviceService : 实现
+    EnvironmentService ..|> IEnvironmentService : 实现
+    RuleService ..|> IRuleService : 实现
+    RuleEngine ..|> IRuleEngine : 实现
+    SceneService ..|> ISceneService : 实现
+    LogService ..|> ILogService : 实现
+    StatisticsService ..|> IStatisticsService : 实现
+    ExportService ..|> IExportService : 实现
+
+    DeviceService --> AppDataRepository : commitDevices / append*Log
     DeviceService --> MockDeviceAdapter : 执行打桩
     DeviceService --> LogService : 写 OperationLog
-    EnvironmentService --> AppDataRepository : 读写快照
-    EnvironmentService --> RuleEngine : 触发求值
-    RuleService --> AppDataRepository : 规则 CRUD
+    EnvironmentService --> AppDataRepository : commitEnvironment / appendEnvironmentLog
+    EnvironmentService --> LogService : 写 EnvironmentLog
+    EnvironmentService ..> RuleEngine : 经 setEvaluationTrigger 注入（不直接 import）
+    RuleService --> AppDataRepository : commitRules
+    RuleEngine --> AppDataRepository : getState / commitRules / commitRuleLogs
     RuleEngine --> RuleActionExecutor : 执行动作
-    RuleEngine --> WriteGuard : 冲突登记
+    RuleEngine --> WriteGuard : 每轮 new + reset
     RuleEngine ..> RuleEvaluationReport : 产出
-    RuleEngine ..> RuleExecutionLog : 唯一写入方
-    RuleActionExecutor --> DeviceService : claim 通过后调用
-    SceneService --> DeviceService : 逐条下发
+    RuleEngine ..> RuleExecutionLog : 唯一写入方（护栏 A-2）
+    RuleActionExecutor --> DeviceService : claim 通过后才调用（护栏 B-2）
+    SceneService --> DeviceService : 逐条下发（actor=SCENE）
+    SceneService --> LogService : 写 SceneSwitchLog
+    SceneService --> AppDataRepository : commitScenes / commitReturnSnapshot / commitCurrentScene
     SceneService ..> SceneApplyReport : 产出
     StatisticsService --> AppDataRepository : 读真实日志
-    LogService --> AppDataRepository : 写日志分区
+    LogService --> AppDataRepository : append*Log（内部 FIFO）
     ExportService --> AppDataRepository : 读全量状态
 
     EntryAbility --> AppDataRepository : 初始化 / 收尾
     EntryAbility --> TimerHost : 生命周期托管
     TimerHost --> EnvironmentSimulator : 驱动 tick
-    EnvironmentSimulator --> EnvironmentService : 更新快照
+    EnvironmentSimulator --> EnvironmentService : applySampled
     MockDataFactory ..> AppState : 首次默认数据
