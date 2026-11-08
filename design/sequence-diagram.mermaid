@@ -9,6 +9,8 @@
 %%   · 阶段三实现：FLOW-01 / FLOW-02 / FLOW-04 的服务调用链（图中标注 <<阶段三>> 的参与者）
 %%   · 阶段四实现：PreferencesStore / WriteQueue 等落盘环节（图中以 Note 明确标注「阶段四」）
 %%   · 因此 FLOW-03 当前**整体尚未实现**，仅真实反映 onCreate/onWindowStageCreate 的现状部分
+%% 【V1.0.3 裁决】原 FLOW-02「设备变更后联动求值」与 FLOW-04「场景切换后按需联动」两处调用**已删除**：
+%%   条件判定的输入只有环境采样值，设备态与场景切换均不改变采样值，调用必为空跑且会消费 dedup 边沿→造成偶发漏触发（负收益）。
 %% 调用链约束：服务 → LogService / IStateWriter → AppDataRepository → （阶段四）WriteQueue → PreferencesStore；
 %%            不画代码中不存在的中间层。
 
@@ -84,7 +86,6 @@ sequenceDiagram
     participant REPO as AppDataRepository（IStateWriter）
     participant MDA as MockDeviceAdapter
     participant LS as LogService
-    participant RE as RuleEngine
 
     UI->>DS: setPower(id, on, USER) 或 setParam(id, key, value, USER)
     DS->>REPO: findDevice(id) / getState()
@@ -111,10 +112,6 @@ sequenceDiagram
             DS->>REPO: notify(reason, partitions)
             REPO-->>UI: 刷新卡片 / 聚合数值 / 状态徽标
             DS-->>UI: CommandResult[Device]{code: OK, changed: true}
-            opt 设计 6.2 记为「设备变更后联动求值」
-                DS-->>RE: evaluate(getSnapshot())
-                Note over DS,RE: ⚠ 待主理人裁决：阶段三派单（T3-02/T3-03）<br/>未含此调用；仅环境变化触发求值。<br/>若采纳本联动，需确认不会误刷 dedup 边沿
-            end
         end
     end
     Note over REPO: 阶段四：commit* 标记分区 dirty → WriteQueue.enqueue → PreferencesStore.put/flush
@@ -195,7 +192,6 @@ sequenceDiagram
     participant REPO as AppDataRepository（IStateWriter）
     participant DS as DeviceService
     participant LS as LogService
-    participant RE as RuleEngine
 
     UI->>SS: apply(sceneId)
     SS->>REPO: getState() 读 scenes / returnSnapshot / currentSceneId
@@ -226,8 +222,4 @@ sequenceDiagram
     LS->>REPO: appendSceneSwitchLog(log)（上限 500，FIFO）
     SS->>REPO: commitCurrentScene(sceneId, mode) + commitScenes(...) + notify
     SS-->>UI: SceneApplyReport（失败项在 UI 可见，不静默）
-    opt 设计 6.4 记为「按需联动求值（FR-05-08）」
-        SS-->>RE: evaluate(当前环境快照)
-        Note over SS,RE: ⚠ 待主理人裁决：阶段三派单（T3-04）未含此调用；<br/>场景只改设备态、不改环境，求值对条件判定无影响
-    end
     Note over REPO: 阶段四：commit* → WriteQueue → PreferencesStore.put(KEY-04/07/09/10) → flush
