@@ -1,16 +1,20 @@
 /**
- * 智寓 · Service 层契约占位（阶段二 / 架构 #58 / 任务列表 T-02 B5）
+ * 智寓 · Service 层契约（阶段三 T3-01 收敛版 / 架构 #58）
  *
  * 本文件只做两件事：
- *  ① 声明 MI-01~14 的最终接口签名（供 ST-03 替换式接入，不改页面与组件）；
- *  ② 提供 Stage2ServiceFacade 单例，所有方法返回「带明确 ResultCode 的安全默认值」，
- *     使阶段二每个可见控件都能真实调用契约并用 Toast 得到明确反馈（FR-08-01）。
+ *  ① 声明 MI-01~14 的最终接口签名（供 ST-03 逐任务替换式接入，不改页面与组件）；
+ *  ② 暂时保留 `Stage2ServiceFacade`（阶段二占位门面），由 T3-05 一次性删除并替换为
+ *     `service/ServiceFacade.ets`。**本文件不再是实现处**，新实现分别落在
+ *     `DeviceService` / `EnvironmentService` / `RuleService` / `RuleEngine` /
+ *     `SceneService` / `LogService` / `StatisticsService` / `ExportService`。
  *
- * ★ 阶段二红线：所有占位方法都带 TODO(ST-03) 说明并返回 NO_CHANGE / NOT_FOUND /
- *   INVALID_PARAM，绝不产生「看起来像真执行」的效果、绝不写业务日志、绝不改内存态。
- * ★ 护栏 A：本文件不声明任何规则执行日志写入方法；RuleEvaluationReport.newLogs 恒为 []。
- * ★ 护栏 B：commandToParamKey() 是 WriteGuard 登记键的唯一映射（B-4）；
- *   ST-03 的 RuleActionExecutor 调用 DeviceService 前必须 guard.claim()（B-2）。
+ * ★ 护栏 A-1：本文件**不得**声明任何规则执行日志的写入接口——规则执行日志只有一个
+ *   提交入口：`AppDataRepository.commitRuleLogs(report)`（参数必须是完整求值报告）。
+ *   `RuleExecutionLog` 只能由 `RuleEngine` 生成，经
+ *   `AppDataRepository.commitRuleLogs(report)` 单点提交。
+ * ★ 护栏 B-4：下方 `commandToParamKey()` 是 `WriteGuard` 登记键
+ *   `(deviceId, paramKey)` 的**唯一**映射实现；严禁在 `RuleActionExecutor` 等处
+ *   复制第二份映射表。
  *
  * 依据：design/系统架构设计.md 4.1 节（MI-01~19）、4.3/4.4 护栏、8.5 日志规则。
  */
@@ -85,7 +89,7 @@ export interface IStatisticsService {
   successRate(logs: RuleExecutionLog[]): number;
 }
 
-/** MI-13：四类日志查询与三类 append（★ 不暴露规则日志写入，护栏 A-1）。 */
+/** MI-13：四类日志查询与三类 append（★ 不暴露规则日志写入，护栏 A-1）。实现：`LogService`。 */
 export interface ILogService {
   query(filter: LogFilter): LogRecord[];
   appendOperation(log: OperationLog): void;
@@ -99,7 +103,7 @@ export interface IExportService {
 }
 
 // ——————————————————————————————————————————————————————————————
-// ② 护栏 B 的 paramKey 映射（阶段二即可定稿的纯函数，ST-03 直接复用）
+// ② 护栏 B 的 paramKey 映射（B-4 唯一实现，全工程禁止第二份映射表）
 // ——————————————————————————————————————————————————————————————
 
 /** DeviceCommand → (deviceId, paramKey) 登记键；不同参数可共存，同参数冲突。 */
