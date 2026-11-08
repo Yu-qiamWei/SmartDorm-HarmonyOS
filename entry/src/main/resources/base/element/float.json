@@ -1,0 +1,52 @@
+{
+  "float": [
+    {
+      "name": "radius_card",
+      "value": "20vp"
+    },
+    {
+      "name": "radius_control",
+      "value": "12vp"
+    },
+    {
+      "name": "radius_badge",
+      "value": "8vp"
+    },
+    {
+      "name": "space_page_x",
+      "value": "20vp"
+    },
+    {
+      "name": "space_card_padding",
+      "value": "16vp"
+    },
+    {
+      "name": "space_item_gap",
+      "value": "12vp"
+    },
+    {
+      "name": "space_section_gap",
+      "value": "20vp"
+    },
+    {
+      "name": "font_title_large",
+      "value": "26fp"
+    },
+    {
+      "name": "font_title_medium",
+      "value": "20fp"
+    },
+    {
+      "name": "font_body",
+      "value": "15fp"
+    },
+    {
+      "name": "font_caption",
+      "value": "12fp"
+    },
+    {
+      "name": "chart_height",
+      "value": "220vp"
+    }
+  ]
+}

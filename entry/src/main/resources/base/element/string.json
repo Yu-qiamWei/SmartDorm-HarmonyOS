@@ -1,0 +1,100 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "智寓智能宿舍管家主模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "智寓主入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "智寓"
+    },
+    {
+      "name": "page_index_title",
+      "value": "宿舍控制中心"
+    },
+    {
+      "name": "page_device_list_title",
+      "value": "设备管理"
+    },
+    {
+      "name": "page_device_detail_title",
+      "value": "设备详情"
+    },
+    {
+      "name": "page_environment_title",
+      "value": "环境监测"
+    },
+    {
+      "name": "page_rule_list_title",
+      "value": "自动化规则"
+    },
+    {
+      "name": "page_rule_edit_title",
+      "value": "编辑规则"
+    },
+    {
+      "name": "page_scene_list_title",
+      "value": "场景模式"
+    },
+    {
+      "name": "page_scene_edit_title",
+      "value": "编辑场景"
+    },
+    {
+      "name": "page_statistics_title",
+      "value": "数据统计"
+    },
+    {
+      "name": "page_settings_title",
+      "value": "设置与数据管理"
+    },
+    {
+      "name": "btn_back",
+      "value": "返回"
+    },
+    {
+      "name": "btn_confirm",
+      "value": "确认"
+    },
+    {
+      "name": "btn_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "btn_save",
+      "value": "保存"
+    },
+    {
+      "name": "btn_add",
+      "value": "添加"
+    },
+    {
+      "name": "btn_delete",
+      "value": "删除"
+    },
+    {
+      "name": "btn_edit",
+      "value": "编辑"
+    },
+    {
+      "name": "btn_apply",
+      "value": "切换"
+    },
+    {
+      "name": "btn_reset",
+      "value": "重置数据"
+    },
+    {
+      "name": "hint_stage2_placeholder",
+      "value": "阶段二接口占位：业务逻辑将在阶段三接入"
+    },
+    {
+      "name": "hint_mock_diagnostic",
+      "value": "模拟/调试区（非真实硬件故障）"
+    }
+  ]
+}

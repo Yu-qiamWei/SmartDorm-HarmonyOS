@@ -1,0 +1,14 @@
+{
+  "module": {
+    "name": "entry_test",
+    "type": "feature",
+    "description": "智寓设备侧测试模块（阶段二仅配置占位，测试用例留 ST-05 真实执行）",
+    "deviceTypes": [
+      "tablet",
+      "phone",
+      "2in1"
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false
+  }
+}

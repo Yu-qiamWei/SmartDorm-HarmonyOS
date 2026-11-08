@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "智寓 HarmonyOS 应用主模块（entry HAP）",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {}
+}

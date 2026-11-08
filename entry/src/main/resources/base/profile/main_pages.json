@@ -1,0 +1,14 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/DeviceList",
+    "pages/DeviceDetail",
+    "pages/Environment",
+    "pages/RuleList",
+    "pages/RuleEdit",
+    "pages/SceneList",
+    "pages/SceneEdit",
+    "pages/Statistics",
+    "pages/Settings"
+  ]
+}
