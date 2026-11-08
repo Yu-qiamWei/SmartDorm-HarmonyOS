@@ -11,6 +11,10 @@
  *
  * ★ 本类不写状态、不写日志：`EnvironmentLog` 由 `EnvironmentService.applySampled()` 写，
  *   保证「日志唯一写入方」不被拆散（设计 4.5）。
+ * ★ 波动基准取**权威快照**（`EnvironmentService.getSnapshot()`），不维护私有副本：
+ *   否则用户手动调整读数后，下一次采样会把环境拉回模拟器自己的旧值（数据不一致）。
+ *   `mock → service` 是合法的向下依赖（mock 为 L5、service 为 L2），且 service 侧
+ *   不 import 本类，无环。
  * ★ 钳制复用 `common/ParamSchema.clampToRange()` 与 `Constants.RANGE`，
  *   不在此处复制第二份范围表。
  *
@@ -21,14 +25,12 @@ import { EnvSource } from '../model/Enums';
 import { RANGE } from '../common/Constants';
 import { clampToRange } from '../common/ParamSchema';
 import { TimeUtil } from '../common/TimeUtil';
-import { MockDataFactory } from './MockDataFactory';
+import { EnvironmentService } from '../service/EnvironmentService';
 import { TimerHost } from './TimerHost';
 
 export class EnvironmentSimulator {
   private static instance: EnvironmentSimulator = new EnvironmentSimulator();
 
-  /** 模拟器内部当前读数；首次 tick 前由默认环境初值播种。 */
-  private current: EnvironmentData = MockDataFactory.createDefaultEnvironment(TimeUtil.now());
   private running: boolean = false;
 
   static getInstance(): EnvironmentSimulator {
@@ -56,13 +58,12 @@ export class EnvironmentSimulator {
     return this.running;
   }
 
-  /** 单步推进：用当前读数生成下一组读数并记为内部当前值。 */
+  /** 单步推进：以权威快照为基准生成下一组读数（不维护私有副本，避免与手动调整冲突）。 */
   tick(): EnvironmentData {
-    const next: EnvironmentData = EnvironmentSimulator.nextReading(
-      this.current, (): number => Math.random(), TimeUtil.now()
+    const base: EnvironmentData = EnvironmentService.getInstance().getSnapshot();
+    return EnvironmentSimulator.nextReading(
+      base, (): number => Math.random(), TimeUtil.now()
     );
-    this.current = next;
-    return next;
   }
 
   /**
