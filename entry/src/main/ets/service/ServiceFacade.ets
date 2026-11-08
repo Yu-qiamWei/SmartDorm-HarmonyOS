@@ -12,16 +12,18 @@
  * ★ 本类**不实现 `IStateWriter`**：门面自己不写状态，`commit*` 只发生在各 service 内部
  *   （护栏 A-4：页面/组件拿不到写权限，门面也不代为转写）。
  * ★ 唯一的两处「组合」职责（不是业务逻辑，而是把分散的服务接在一起）：
- *   ① `updateSettings()` 后同步环境模拟开关与采样间隔（否则 FR-03-07 的总开关形同虚设，
- *      设置页与首页会各说一套）；总开关切换时按 FR-04-10 复位全部规则的去重标记；
- *   ② `buildBarModel()` 保留阶段二的 `(logs, groupBy)` 形参，内部补上真实设备数组，
- *      因为 `OperationLog` 没有 `type` 字段，按设备类型分组必须借 `Device.type`。
+ *   ① `initialize(context)` 完成**全部依赖注入**（只此一处，页面与服务互不 new 对方）：
+ *      `ExportService` 的应用上下文、`DeviceService` 的 Mock 只读查询、
+ *      `EnvironmentService` 的求值触发（指向 `RuleEngine.evaluate`）；
+ *   ② `updateSettings()` 后同步环境模拟开关与采样间隔（否则 FR-03-07 的总开关形同虚设，
+ *      设置页与首页会各说一套）；总开关切换时按 FR-04-10 复位全部规则的去重标记。
  *
  * 依据：design/系统架构设计.md 4.1/4.2、4.7；design/任务列表-第三阶段.md T3-05。
  */
+import { common } from '@kit.AbilityKit';
 import { AppDataRepository } from '../store/AppDataRepository';
 import { DeviceService } from './DeviceService';
-import { EnvironmentService } from './EnvironmentService';
+import { EnvironmentService, EvaluationTrigger } from './EnvironmentService';
 import { RuleService } from './RuleService';
 import { RuleEngine } from './RuleEngine';
 import { SceneService } from './SceneService';
@@ -58,6 +60,36 @@ export class ServiceFacade {
   }
 
   private constructor() {
+  }
+
+  // ——————————————————————————————————————————————————————————
+  // 组合根：全部依赖注入只在这里发生（页面不得注入、服务不得互相 new）
+  // ——————————————————————————————————————————————————————————
+
+  /**
+   * 初始化门面并完成三处依赖注入。
+   *
+   * 由 `EntryAbility.onCreate` 调用 **一次**（`this.context` 是应用上下文的唯一持有者，
+   * 所以入口职责只是「把上下文递进来」，注入动作全部在本类完成）。
+   *
+   * ① `ExportService.init(context)`：沙箱 `filesDir` 导出能力；
+   * ② `DeviceService.installMockLookup()`：Mock 适配器的只读设备查询（幂等）；
+   * ③ `EnvironmentService.setEvaluationTrigger(...)`：**采样 → 规则求值**的触发点。
+   *    不注入则环境采样永远不会触发求值，整条自动化链路是死的，而这一点编译期看不出来。
+   *
+   * 三个 setter 本身幂等，因此本方法可重复调用（Ability 重建时安全）。
+   */
+  initialize(context: common.Context): void {
+    ExportService.getInstance().init(context);
+    DeviceService.getInstance().installMockLookup();
+    const trigger: EvaluationTrigger = (snapshot: EnvironmentData): Promise<void> => {
+      // 报告的返回值在此丢弃：提交（commitRules → commitRuleLogs）已在 evaluate 内部完成
+      const evaluated: Promise<void> =
+        RuleEngine.getInstance().evaluate(snapshot).then((): void => {
+        });
+      return evaluated;
+    };
+    EnvironmentService.getInstance().setEvaluationTrigger(trigger);
   }
 
   // ——————————————————————————————————————————————————————————

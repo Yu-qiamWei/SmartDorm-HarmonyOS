@@ -12,10 +12,11 @@
  * 采样链路（设计 4.7）：
  *   TimerHost.tick() → EnvironmentSimulator.tick() → EnvironmentService.applySampled(next)
  *                                                      → 写 EnvironmentLog(SIMULATED)
- *                                                      → 调用**注入的** trigger（本文件 T3-05 设置）
- * 本文件是组合根：`EnvironmentService` 侧**不 import** `RuleEngine`（防环依赖），
- * 求值入口在 `onCreate` 里通过 `setEvaluationTrigger()` 一次性注入；`ExportService`
- * 的应用上下文也在同一处注入（与阶段四持久化共用注入点）。
+ *                                                      → 调用**注入的** trigger
+ * 本文件是应用入口，**不是**注入点：依赖注入全部由 `ServiceFacade.initialize(this.context)`
+ * 一次性完成（导出上下文 / Mock 只读查询 / 求值触发），本类只负责把应用上下文递进去。
+ * 因此本文件不 import `RuleEngine`、不 import `ExportService`，`EnvironmentService` 侧
+ * 也不 import `RuleEngine`（防环 + 单一注入点）。
  *
  * 依据：design/系统架构设计.md 9.1 第 15/21/22/31 项（均已实测核验）、4.7。
  * 需求：NFR-04、FR-03-07、E6（simulationEnabled 控制 TimerHost）、E5（触发链闭环）。
@@ -28,23 +29,20 @@ import { AppSettings } from '../model/AppSettings';
 import { EnvironmentData } from '../model/EnvironmentData';
 import { TimerHost } from '../mock/TimerHost';
 import { EnvironmentSimulator } from '../mock/EnvironmentSimulator';
-import { EnvironmentService, EvaluationTrigger } from '../service/EnvironmentService';
-import { RuleEngine } from '../service/RuleEngine';
-import { ExportService } from '../service/ExportService';
+import { EnvironmentService } from '../service/EnvironmentService';
+import { ServiceFacade } from '../service/ServiceFacade';
 import { DEFAULT_SAMPLE_INTERVAL_MS } from '../common/Constants';
 
 export default class EntryAbility extends UIAbility {
-  /** 冷启动：载入内存态、注入导出上下文与求值触发、按设置配置定时器并启停模拟。 */
+  /** 冷启动：载入内存态、把上下文交给门面完成注入、按设置配置定时器并启停模拟。 */
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     const state: AppState = AppDataRepository.getInstance().load();
     const settings: AppSettings = state.settings;
     const intervalMs: number =
       settings.sampleIntervalMs > 0 ? settings.sampleIntervalMs : DEFAULT_SAMPLE_INTERVAL_MS;
-    // ① 导出能力注入应用上下文（沙箱 filesDir；未注入时导出返回 STORAGE_ERROR 而非崩溃）
-    ExportService.getInstance().init(this.context);
-    // ② 求值触发链闭环：环境变化 → RuleEngine.evaluate（报告被丢弃，求值本身已提交日志）
-    this.installEvaluationTrigger();
-    // ③ 采样定时器与模拟器按设置启停
+    // ① 依赖注入全部由门面完成（导出上下文 / Mock 只读查询 / 求值触发），此处只递上下文
+    ServiceFacade.getInstance().initialize(this.context);
+    // ② 采样定时器与模拟器按设置启停
     TimerHost.getInstance().configure(settings.simulationEnabled, intervalMs);
     this.registerSampling(intervalMs);
     const simulator: EnvironmentSimulator = EnvironmentSimulator.getInstance();
@@ -80,21 +78,6 @@ export default class EntryAbility extends UIAbility {
   onDestroy(): void {
     TimerHost.getInstance().release(TimerHost.getInstance().currentHandle());
     AppDataRepository.getInstance().flush();
-  }
-
-  /**
-   * 注入求值触发函数（一次性，重复注入等价覆盖）。
-   * 报告的返回值在此处被丢弃：`RuleEngine.evaluate()` 内部已完成
-   * `commitRules` → `commitRuleLogs` 的提交，采样链路只需要「等它跑完」。
-   */
-  private installEvaluationTrigger(): void {
-    const trigger: EvaluationTrigger = (snapshot: EnvironmentData): Promise<void> => {
-      const evaluated: Promise<void> =
-        RuleEngine.getInstance().evaluate(snapshot).then((): void => {
-        });
-      return evaluated;
-    };
-    EnvironmentService.getInstance().setEvaluationTrigger(trigger);
   }
 
   /**

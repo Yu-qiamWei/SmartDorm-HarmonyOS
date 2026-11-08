@@ -48,20 +48,26 @@ export class DeviceService implements IDeviceService {
   private static instance: DeviceService = new DeviceService();
 
   static getInstance(): DeviceService {
-    if (!DeviceService.instance.wired) {
-      DeviceService.instance.wire();
-    }
     return DeviceService.instance;
   }
 
-  private wired: boolean = false;
+  private lookupInstalled: boolean = false;
 
   private constructor() {
   }
 
-  /** 注入只读设备查询给 Mock 适配器（只注入一次，避免 mock 层依赖 store）。 */
-  private wire(): void {
-    this.wired = true;
+  /**
+   * 组合根注入（T3-05）：把只读设备查询交给 Mock 适配器。
+   *
+   * 由 `ServiceFacade.initialize()` 在 `EntryAbility.onCreate` 调用 **一次**；
+   * 幂等，重复调用不产生副作用。放在这里而不是 `getInstance()` 里，
+   * 是为了让「谁注入谁」在代码里**只有一处**可 grep（避免隐式自举）。
+   */
+  installMockLookup(): void {
+    if (this.lookupInstalled) {
+      return;
+    }
+    this.lookupInstalled = true;
     MockDeviceAdapter.getInstance().setLookup((id: string): Device | undefined => {
       return AppDataRepository.getInstance().findDevice(id);
     });
