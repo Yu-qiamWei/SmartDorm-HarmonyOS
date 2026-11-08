@@ -27,3 +27,6 @@
 .env
 *_token*
 *_secret*
+
+# 阶段五 L2 单测生成物（由 .ets 复制并改写 import 得到，不手工维护）
+/tests/.gen/
