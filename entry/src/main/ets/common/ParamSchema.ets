@@ -7,22 +7,33 @@ import { DeviceType, ParamKey, ResultCode, ACMode, SensorType } from '../model/E
 import { ParamValue, DeviceParamsFactory } from '../model/DeviceParams';
 import { RANGE, NumericRange } from './Constants';
 
-/** ParamKey → 数值区间映射（布尔 / 枚举型键不在此表）。 */
-export const PARAM_RANGE: Record<string, NumericRange> = {
-  brightness: RANGE.BRIGHTNESS,
-  temperature: RANGE.AC_TEMPERATURE,
-  openPercent: RANGE.OPEN_PERCENT,
-  fanSpeed: RANGE.FAN_SPEED,
-  powerWatt: RANGE.POWER_WATT
-};
+/**
+ * 构建 ParamKey → 数值区间映射（布尔 / 枚举型键不在此表）。
+ * ArkTS 严格类型禁止对 Record<K, V> 直接赋非空对象字面量，故逐键赋值。
+ */
+function buildParamRange(): Record<string, NumericRange> {
+  const table: Record<string, NumericRange> = {};
+  table['brightness'] = RANGE.BRIGHTNESS;
+  table['temperature'] = RANGE.AC_TEMPERATURE;
+  table['openPercent'] = RANGE.OPEN_PERCENT;
+  table['fanSpeed'] = RANGE.FAN_SPEED;
+  table['powerWatt'] = RANGE.POWER_WATT;
+  return table;
+}
 
-/** 传感器 → 数值区间映射（布尔型 HUMAN_PRESENCE 不在此表）。 */
-export const SENSOR_RANGE: Record<string, NumericRange> = {
-  TEMPERATURE: RANGE.TEMPERATURE,
-  HUMIDITY: RANGE.HUMIDITY,
-  ILLUMINANCE: RANGE.ILLUMINANCE,
-  AIR_QUALITY: RANGE.AIR_QUALITY
-};
+/** 构建传感器 → 数值区间映射（布尔型 HUMAN_PRESENCE 不在此表）。 */
+function buildSensorRange(): Record<string, NumericRange> {
+  const table: Record<string, NumericRange> = {};
+  table['TEMPERATURE'] = RANGE.TEMPERATURE;
+  table['HUMIDITY'] = RANGE.HUMIDITY;
+  table['ILLUMINANCE'] = RANGE.ILLUMINANCE;
+  table['AIR_QUALITY'] = RANGE.AIR_QUALITY;
+  return table;
+}
+
+export const PARAM_RANGE: Record<string, NumericRange> = buildParamRange();
+
+export const SENSOR_RANGE: Record<string, NumericRange> = buildSensorRange();
 
 /** 是否为合法空调模式值。 */
 export function isACMode(value: ParamValue): boolean {

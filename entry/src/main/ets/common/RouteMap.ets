@@ -6,6 +6,18 @@
  */
 import { router, promptAction } from '@kit.ArkUI';
 
+/**
+ * 路由参数载体（显式 interface，供对象字面量在严格类型下获得上下文类型）。
+ * ArkTS 禁止对 Record<K, V> 赋非空对象字面量，故用显式 interface 承载。
+ * 读取侧见 common/RouteParams.ets。
+ */
+export interface RouteParamsValue {
+  mode?: string;
+  deviceId?: string;
+  ruleId?: string;
+  sceneId?: string;
+}
+
 export class RouteMap {
   static readonly INDEX: string = 'pages/Index';
   static readonly DEVICE_LIST: string = 'pages/DeviceList';
@@ -32,8 +44,8 @@ export class RouteMap {
     RouteMap.SETTINGS
   ];
 
-  /** 推送新页面；params 用 Record<string, string> 严格类型，禁止传未解析的 Object。 */
-  static push(url: string, params?: Record<string, string>): void {
+  /** 推送新页面；params 用显式 RouteParamsValue 严格类型，禁止传未解析的 Object。 */
+  static push(url: string, params?: RouteParamsValue): void {
     if (params === undefined) {
       router.pushUrl({ url: url }).catch((): void => {
         promptAction.showToast({ message: '页面跳转失败：' + url });
