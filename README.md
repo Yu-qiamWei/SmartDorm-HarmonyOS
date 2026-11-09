@@ -65,7 +65,7 @@
 | 3 | **环境监测** | 温度、湿度、光照、AQI、人体存在 5 类读数、周期刷新、趋势折线图 | ✅ 页面与服务已落地 |
 | 4 | **自动化规则编排** | 多条件（与/或）组合、条件持续时长、多动作顺序执行、启停、优先级 | ✅ 引擎/服务已落地，编辑页已落地 |
 | 5 | **场景模式** | 场景一键切换、场景内设备状态批量应用、切换留痕 | ✅ 页面与服务已落地 |
-| 6 | **数据统计** | 设备运行统计、规则触发次数、执行成功率、日志查询与筛选 | ✅ 服务已落地，第二张图表在收尾 |
+| 6 | **数据统计** | 设备运行统计、规则触发次数、执行成功率、日志查询与筛选 | ✅ 页面与服务已落地；温度趋势折线图、设备操作次数等图表见 `screenshots/31_stats_charts.jpeg` |
 | 7 | **设置** | 自动化总开关、模拟周期、日志清理、数据导出、关于 | ✅ 页面已落地 |
 
 ### 4.2 规则引擎能力（本项目的核心）
@@ -191,19 +191,21 @@ SmartDorm-HarmonyOS/
 ├── docs/                         # 软件需求说明书（PRD，12 项成节）
 ├── design/                       # 系统架构设计、类图/时序图、各阶段任务列表、测试执行方案
 ├── stages/                       # 各阶段阶段报告
-├── evidence/                     # 证据归档：环境检查、构建日志、走查记录、占位清单
-├── screenshots/                  # 运行截图归档（当前为空，原因见该目录 README）
-├── videos/                       # 连续真实录屏归档（当前为空）
+├── tests/l2/                     # L2 Node 侧纯逻辑断言：gen.js / run.js / t4*.js 判据 / stubs
+├── evidence/                     # 证据归档：环境检查、逐阶段构建日志、阶段四验收报告、L2 断言输出、
+│                                 #   preferences 落盘原文（prefs_*）、导出快照（export_*）、设备侧 UI dump（device/）
+├── screenshots/                  # 设备端实拍截图归档（API 17 模拟器，见第 9 节与本目录 README）
+├── videos/                       # 连续真实录屏归档（当前为空，DL-05 待产出，见第 10 节）
 ├── deliverables/                 # 最终交付包（Word 报告等）
-├── scripts/                      # 辅助脚本（build-hap.bat 命令行构建）
+├── scripts/                      # 辅助脚本（build-hap.bat 命令行构建、设备采集 / 布局脚本）
 ├── hvigor/                       # hvigor wrapper
-├── build-profile.json5           # 构建配置（产品、SDK 版本、签名占位）
+├── build-profile.json5           # 构建配置（产品、SDK 版本，当前未配置签名）
 ├── oh-package.json5              # 包描述与依赖
 ├── hvigorfile.ts                 # 构建脚本入口
 └── README.md                     # 本文件
 ```
 
-**源码规模**：`entry/src/main/ets` 下共 **70 个 `.ets` 文件、约 9,300 行 ArkTS 代码**。
+**源码规模（实测）**：`entry/src/main/ets` 下共 **75 个 `.ets` 文件、约 12,981 行 ArkTS 代码**（含 ST-04 持久化层与 ST-05 缺陷修复后的增量）。
 
 ---
 
@@ -240,9 +242,35 @@ node "D:/DevEco Studio/tools/hvigor/bin/hvigorw.js" \
 
 产物路径：`entry/build/default/outputs/default/entry-default-unsigned.hap`
 
-> ⚠️ 该产物为**未签名** HAP，仅供构建验证，不能直接安装到设备。真机安装需在 DevEco Studio 中配置签名（`Project Structure → Signing Configs`）后重新构建。
+> ⚠️ 该产物为**未签名** HAP（工程未配置 `signingConfigs`，hvigor 日志提示 `Will skip sign 'hos_hap'`）。**实测**：该未签名包在 API 17 模拟器 `127.0.0.1:5555` 上通过 `hdc install -r` **直接安装成功**（该模拟器未强制签名校验），见 `evidence/运行验证报告-模拟器.md` §2.3。此结论**仅对当前模拟器成立，不能推广为"真机也不需要签名"**；正式真机分发仍需在 DevEco Studio 配置签名（`Project Structure → Signing Configs`）后重新构建。
 
-### 8.4 构建成功判定标准
+### 8.4 安装 / 启动 / 重启（API 17 设备，实测命令）
+
+```bash
+hdc list targets                       # 期望可见 127.0.0.1:5555
+hdc shell param get const.ohos.apiversion   # 期望 17
+hdc install -r entry/build/default/outputs/default/entry-default-unsigned.hap
+hdc shell aa start -a EntryAbility -b com.smartdorm.harmony
+hdc shell ps -ef | grep smartdorm      # 确认进程拉起
+```
+
+冷启动 / 重启验证（阶段四 12 步验收实测原文，见 `evidence/阶段四验收报告.md` §3.2）：
+
+```bash
+hdc shell bm clean -d                  # 清空应用数据
+hdc shell aa force-stop com.smartdorm.harmony
+hdc shell aa start -a EntryAbility -b com.smartdorm.harmony
+```
+
+### 8.5 复跑 L2 纯逻辑断言
+
+```bash
+node tests/l2/run.js
+```
+
+无需设备，`gen.js` 生成 `.gen/src` → DevEco 自带 tsc 编译 → 逐桶执行断言，阶段五实测 **307 断言 0 失败**（输出归档 `evidence/l2-阶段五.txt`）。详见 `tests/l2/README.md` 与第 12 节。
+
+### 8.6 构建成功判定标准
 
 - 出现 `Finished ::entry:default@CompileArkTS`
 - 出现 `BUILD SUCCESSFUL`
@@ -254,39 +282,57 @@ node "D:/DevEco Studio/tools/hvigor/bin/hvigorw.js" \
 
 ## 9. 运行截图
 
-**当前状态：无截图。** 如实说明原因：
+**已归档设备端实拍截图**，位于 `screenshots/`，全部来自运行中的 **API 17 设备（模拟器 `127.0.0.1:5555`，`OpenHarmony-5.0.5.165`）**，由 `hdc shell snapshot_display` 采集、`hdc file recv` 取回，分辨率 1260 × 2720 px，**未裁剪拼接、非 Previewer 渲染、非静态设计稿、非预设假效果**。采集方式与逐文件对照见 `screenshots/README.md` 与 `evidence/运行验证报告-模拟器.md`。
 
-| 阻塞项 | 实际情况 |
-| --- | --- |
-| 真机 | 未接入 API 17 HarmonyOS 设备 |
-| 模拟器 | 已部署镜像 API Level 与 SDK API 17 不匹配；启动时 `CheckRuntimeEnv::RunCheck` 报 `Invalid System-image Path!`，命令行方式无法拉起，需 DevEco Studio Device Manager 图形界面操作 |
-| `hdc list targets` | `[Empty]` |
-| Previewer | 本次为命令行会话，未启动 DevEco Studio GUI，未进行 Previewer 渲染 |
+> **载体诚实边界**：本批截图的运行载体为 API 17 **模拟器**（`const.product.model = emulator`），**不是物理真机**；可据此说明"应用在 API 17 设备端真实运行"，但**不得据此宣称"真机运行通过"**，也不作为报告图 6.1 / 6.2 的物理真机证据。物理真机接入后的补测仍待进行。
 
-**纪律**：本仓库**不放静态示意图**、**不放伪造截图**、**不把 Previewer 截图冒充真机运行效果**。
-真实截图将在接入 API 17 设备后归档至 `screenshots/`，并在文件名或随附记录中标注是否为真机。
-当前逐页结论见 `evidence/Previewer走查-阶段二.md`（性质为**源码级走查**，非 UI 截图）。
+| 功能域 | 代表截图（`screenshots/` 下真实文件） | 对应观察点 |
+| --- | --- | --- |
+| 首页控制中心 | `01_home.jpeg`、`20_index_after_fix.jpeg`、`34_index_after_scene.jpeg` | 环境概览、6 类设备卡片、运行模式回显、修复前后标题/数值折行对比 |
+| 设备管理 | `02_device_list.jpeg`、`03_device_detail.jpeg`、`07_bright_reject.jpeg`、`08_delete_confirm.jpeg` | 列表 / 详情、亮度越界被拒 Toast、删除二次确认 |
+| 环境监测 | `09_environment.jpeg`、`09_rule.jpeg` | 5 类传感器读数与采样 |
+| 自动化规则编排 | `12_rule_edit.jpeg`、`23_rule_list_one.jpeg`、`28_two_rules.jpeg`、`24_eval_triggered.jpeg`、`29_rule_triggered.jpeg`、`10_eval_report.jpeg` | 规则创建 / 列表 / 两条规则 / 求值报告（去重跳过） |
+| 执行记录与统计 | `30_exec_log.jpeg`、`31_stats_charts.jpeg`、`40_stats_final.jpeg` | 四类计数、温度趋势折线图、三张图表连续区间、成功率百分比 |
+| 场景模式 | `32_scene_list.jpeg`、`33_scene_switched.jpeg`、`06_scene_study.jpeg` | 4 个预置场景、切换后 `当前运行模式：STUDY` |
+| 设置与持久化 | `02_settings.jpeg`、`35_settings.jpeg`、`38_after_restart.jpeg` | 设置页、重启后数据回读 |
+| ST-05 L4 第一批用例 | `st05_n01_home_before.jpeg` / `st05_n01_home_after.jpeg` / `st05_n01_log_history.jpeg`、`st05_n04_home_sleep.jpeg`、`st05_n05_brightness80.jpeg` / `st05_n05_home_return.jpeg`、`st05_e01_nochange_toast2.jpeg` | 手动开灯、场景批量变更、回寝恢复用户预设、重复开启无变更 |
+
+阶段四 **12 步冷启动重启验收**的截图清单与逐字段比对见 `evidence/阶段四验收报告.md` §3.2 / §3.6。
 
 ---
 
 ## 10. 功能演示
 
-**当前状态：无录屏。** 同第 9 节原因，尚不具备真实运行环境，因此**未产出**符合要求的连续真实录屏。
+### 10.1 连续真实录屏（DL-05）：仍待产出，P0 不降级
 
-规划中的录屏须连续覆盖 **10 个环节**，不允许剪辑拼接、不允许预设演示数据、不允许静态图替代图表：
+`videos/` 目录**当前为空**，符合 DL-05 要求的**连续真实录屏尚未录制**，因此本仓库任何位置均**不宣称"演示已完成"**。该项保持 P0，不以 Previewer 截图、静态图或分环节截图替代。录屏须连续覆盖 **10 个环节**，不允许剪辑拼接、不允许预设演示数据、不允许静态图替代图表：
 
 ```
 启动 → 首页 → 手动控制 → 环境变化 → 创建规则 → 触发规则
      → 查看执行记录 → 切换场景 → 查看历史 → 重启验证数据恢复
 ```
 
-产出后归档至 `videos/`。**在完成真机录制前，本仓库任何位置均不宣称"演示已完成"。**
+产出后归档至 `videos/`。
+
+### 10.2 分环节设备端证据链（已完成，非录屏）
+
+连续录屏虽未产出，但上述关键环节已有**设备端实拍截图 + 状态导出**的分环节证据，可用于核对流程真实性：
+
+| 环节 | 现有证据 |
+| --- | --- |
+| 启动 / 首页 | `screenshots/01_home.jpeg`、`20_index_after_fix.jpeg`；`evidence/运行验证报告-模拟器.md` §3 启动链路日志 |
+| 手动控制 | `screenshots/st05_n01_home_before.jpeg` → `st05_n01_home_after.jpeg`；`evidence/device/st05_n01_before.json` / `st05_n01_after.json` |
+| 环境变化 / 创建规则 / 触发规则 | `screenshots/09_environment.jpeg`、`23_rule_list_one.jpeg`、`24_eval_triggered.jpeg`、`29_rule_triggered.jpeg`、`10_eval_report.jpeg` |
+| 查看执行记录 / 切换场景 / 查看历史 | `screenshots/30_exec_log.jpeg`、`31_stats_charts.jpeg`、`33_scene_switched.jpeg`、`st05_n04_home_sleep.jpeg` |
+| 重启验证数据恢复 | `screenshots/38_after_restart.jpeg`；`evidence/阶段四验收报告.md` §3.2（12 步逐字段比对）；`evidence/export_before.json` / `export_after.json` / `prefs_before` / `prefs_after` |
+
+> 分环节证据**不等价于**连续录屏；DL-05 的录屏缺口如实保留。截图载体为 API 17 模拟器，见第 9 节载体诚实边界。
 
 ---
 
 ## 11. 持久化说明
 
-### 11.1 设计（已定稿，见 `design/系统架构设计.md`）
+### 11.1 设计要点（方案基线，见 `design/系统架构设计.md`；以下方案均已在 ST-04 落地，落地状态见 11.2）
 
 | 设计点 | 方案 |
 | --- | --- |
@@ -300,33 +346,62 @@ node "D:/DevEco Studio/tools/hvigor/bin/hvigorw.js" \
 | 加载一致性 | 三级校验：版本号 → 分区块完整性 → 反序列化结构校验，任一失败降级为空态并记日志，**不崩溃** |
 | 日志上限 | `OperationLog` 1000 / `RuleExecutionLog` 1000 / `EnvironmentLog` 2000 / `SceneSwitchLog` 500，FIFO 淘汰 |
 
-### 11.2 当前实现状态（如实）
+### 11.2 ST-04 实现状态（已落地，代码完成 ✅ / 构建通过 ✅ / 设备端验证通过 ✅）
 
-| 项 | 状态 |
+`AppDataRepository.flush()` **已为真实写入**（不再是桩函数）；应用退出后数据保留。实现清单与签名对照见 `evidence/阶段四验收报告.md` §一。
+
+| 实现点 | 落地情况 |
 | --- | --- |
-| `StorageKeys` 键常量与分区枚举 | ✅ 已定稿 |
-| `AppDataRepository.load()` 内存装配 | ✅ 已实现 |
-| `commit*` / `append*Log` 内存侧写入 | ✅ 已实现 |
-| **`flush()` 真实落盘** | ❌ **未实现**，当前为显式桩函数，返回 `NO_CHANGE` 并注明"阶段四接串行写队列" |
-| 版本迁移 / 分块序列化 / 重启恢复验收 | ❌ 属 ST-04，未开始 |
+| 分区分键 | `StorageKeys` 定义 **9 个分区**、分块键 / 头键生成与 chunk 索引解析；`smartdorm.<partition>.hdr` + `.cNNNN` |
+| 分块序列化 | `Serializer` 分块编码（头 + 块四字段 `p/i/t/d`）、运行时元信息 `smartdorm.meta.runtime` 编解码、版本迁移头校验；规避 `MAX_VALUE_LENGTH = 8192` |
+| 串行写队列 | `WriteQueue` 单链串行、分区合并、两路防抖、执行期快照、失败保 dirty |
+| 版本迁移 | `SchemaMigration` `v0→v1` 迁移、版本越界拒绝写回 |
+| **导出前落盘** | `ExportService.exportToFilesDir` 改为 `async Promise<CommandResult<string>>`，**首行 `await AppDataRepository.getInstance().flush()`**；落盘失败即中止导出并返回 `STORAGE_ERROR`，绝不谎报成功（4 处签名联动改异步） |
+| 仓储接线 | `AppDataRepository.load()` / `flush()` / `saveNowSync()` / `reset()` / `getDiagnostics()` / `getRuntimeMeta()`，**9 分区逐分区降级** |
+| 生命周期收尾 | `EntryAbility.onCreate` → init + load；`onBackground` → flush；`onDestroy` → `saveNowSync()` 同步落盘 |
+| 逐分区降级 | 三级校验（版本号 → 分区块完整性 → 反序列化结构校验），某一分区失败仅该区降级为空态并写诊断，**不影响其他分区、不崩溃** |
+| 日志上限 | `OperationLog` 1000 / `RuleExecutionLog` 1000 / `EnvironmentLog` 2000 / `SceneSwitchLog` 500，FIFO 淘汰 |
 
-> 因此：**当前版本退出应用后数据不会保留**。这是已知且已声明的限制，不是缺陷隐瞒。
-> ST-04 完成后将执行强制 8 步验收：`启动 → 改状态 → 建规则 → 保存 → 退出 → 重启 → 逐项验证 6 类数据一致 → 读取失败不崩溃`，证据归档至 `evidence/`。
+#### 11.2.1 12 步冷启动重启验收（已通过）
+
+`bm clean -d` → `aa start` 冷启动 → 记录首指纹 → 改设备 / 建规则 / 触发 / 切场景 / 改设置 / 造日志 → 手动保存（提示「保存结果：操作成功（已落盘，残留待写分区 0 个）」）→ `aa force-stop` 真实杀进程 → `aa start` 冷启动 → 逐字段比对。实测结论：
+
+- `bootCount` **1 → 2**，`firstLaunchAt` **跨重启不变**（`1794210264259`），证明运行时元信息写入并被读回；
+- `devices[0].id` / `createdAt` **完全一致**（证明是读回而非重新生成）、`powerOn=false` 与设定一致；
+- `currentMode=STUDY`、`currentSceneId`、`logLimit=1100`、`simulationEnabled=true` 逐项一致；
+- 落盘原文 `prefs_before` / `prefs_after` 可拉回，含 `.hdr` / `.c0000` 分块键，体积 146 085 B → 158 390 B 随数据增长；**12 项字段全部 PASS**。
+
+#### 11.2.2 降级与诚实边界（如实标注，不改变三态结论）
+
+| 项 | 结论 |
+| --- | --- |
+| 方案 C（解码侧，L2 注入坏块 / 坏头 / 坏版本） | ✅ 逐分区独立降级，`tests/l2/t402_*.js` / `t403_repository.js` 覆盖 |
+| 方案 D（`bm clean -d` 清空存储后冷启动） | ✅ 进程正常拉起（未崩溃）、回默认态、诊断可见 |
+| C6「手工写坏块后重启」 | ⚠️ **设备侧未能原样复现**：`hdc shell` 为 `uid=2000(shell)`，对应用沙箱 `Permission denied`；已用 L2 注入 + 方案 D 替代，**不计入通过** |
+| 规则分区端到端 UI 创建 | ⚠️ 提交控件在设备自动化中未触发，`rules` 分区始终为 0 条；但其使用与设备/场景**完全相同的分块管线**（L2 K 系列 + 逐区降级覆盖），属「机制已验证、端到端 UI 创建未跑通」，不冒领通过 |
+| 导出 / 落盘 mtime 微序 | `@ohos.data.preferences` 导出后一次冗余回写（内容相同），非数据丢失；内容一致性由三份导出交叉印证 |
+
+**证据清单**：`evidence/阶段四验收报告.md`、`evidence/阶段四-构建日志.txt`（`BUILD SUCCESSFUL`、CompileArkTS 18 s 169 ms、0 个 `ArkTS:ERROR`、HAP 1 437 310 bytes）、`evidence/l2-阶段四.txt`（282 断言）、`evidence/l2-阶段五.txt`（307 断言）、`export_before.json` / `export_after.json` / `exp_latest.json`、`prefs_before` / `prefs_after` / `prefs_clean`、`extract_meta.js`。
 
 ---
 
 ## 12. 测试说明
 
-### 12.1 测试分层
+### 12.1 测试分层与当前进度（ST-05 进行中，未收口）
 
-| 层 | 内容 | 状态 |
-| --- | --- | --- |
-| L1 构建门禁 | 每个任务完成后必须 `BUILD SUCCESSFUL` 且零 `ArkTS:ERROR`，构建日志归档 | ✅ 已执行，日志见 `evidence/构建日志-阶段二.md`、`evidence/构建日志-阶段三.md` |
-| L2 服务层逻辑测试 | 不依赖 UIAbility 的纯逻辑用例，用 DevEco 内置 TypeScript 编译器做零依赖类型检查 + 断言执行 | ⏳ 方案已定稿（`design/测试执行方案-阶段五.md`），部分待脚本化 |
-| L3 持久化验收 | 强制 8 步重启一致性验收 | ❌ 阻塞于 ST-04 |
-| L4 真机 / 模拟器运行测试 | 正常 / 边界 / 异常三类用例真机执行，六要素留证 | ❌ 阻塞于设备 |
+| 层 | 内容 | 当前状态 | 证据 |
+| --- | --- | --- | --- |
+| L1 构建门禁 | 每任务完成后必须 `BUILD SUCCESSFUL` 且零 `ArkTS:ERROR`，构建日志归档 | ✅ 已执行并通过（阶段二 / 三 / 四） | `evidence/构建日志-阶段二.md`、`构建日志-阶段三.md`、`阶段四-构建日志.txt` |
+| **L2 纯逻辑断言** | Node 侧零依赖类型检查 + 断言，覆盖键拼接 / 写队列 / 分块编解码 / 版本迁移 / 诊断缓冲 / 规则业务判据；不依赖 UIAbility | ✅ **307 断言 0 失败**（阶段五最新，`evidence/l2-阶段五.txt`；阶段四快照为 282 断言 `l2-阶段四.txt`） | `evidence/l2-阶段五.txt` |
+| L3 持久化验收 | 12 步冷启动重启一致性 + 逐分区降级 | ✅ 已通过（ST-04，见第 11.2 节） | `evidence/阶段四验收报告.md` |
+| L3 DevEco Previewer 走查 | 10 页 UI 渲染走查（需 GUI） | ⏳ **尚未实跑**，属 ST-05 范畴 | `evidence/Previewer走查-阶段二.md`（性质为源码级走查，非 UI 截图） |
+| **L4 设备端运行测试** | 正常 / 边界 / 异常三类用例在 API 17 设备端执行，六要素留证 | ⏳ **进行中**：第一批 **4 个用例已通过并归档**（TC-N-01 / TC-N-04 / TC-N-05 / TC-E-01），**第二批执行中** | `evidence/device/st05_*`、`screenshots/st05_*`、PRD 第 16 章表 5.1 |
 
-### 12.2 用例分类（共 22 条，详见 `design/测试执行方案-阶段五.md`）
+> **纪律**：ST-05 尚未收口，上表未列出「全部通过」；未执行的用例一律如实标注「进行中 / 尚未实跑」，**不虚构测试结论**。L4 运行载体为 API 17 模拟器 `127.0.0.1:5555`（见第 9 节载体诚实边界）。
+
+### 12.2 用例分类与判据
+
+用例体系见 `design/测试执行方案-阶段五.md`（V1.3 口径：分 L2 主判定 / L4 设备端 / Previewer 走查三类），PRD 第 16 章表 5.1 为结果登记处。
 
 | 类别 | 覆盖重点 |
 | --- | --- |
@@ -334,12 +409,28 @@ node "D:/DevEco Studio/tools/hvigor/bin/hvigorw.js" \
 | 边界用例 TC-B | 参数取边界值（亮度 0/100、温度 16/30、窗帘 0/100）、条件恰好满足持续时长、日志达到上限后 FIFO |
 | 异常用例 TC-E | 参数越界拒绝、规则条件永假、动作执行失败、设备离线、读取持久化数据损坏不崩溃 |
 
-每条用例须留**六要素**：用例编号、前置条件、操作步骤、预期结果、实际结果、证据路径。
+每条用例须留**六要素**：用例编号、前置条件 / Mock 输入、操作步骤、预期结果、**实际结果**、**证据路径**。实际结果 / 是否通过 / 证据路径三列**只对已真实执行的用例填写**，未执行的保留空白，严禁预填。
 
-### 12.3 已知构建门禁局限（重要）
+**L4 第一批 4 用例（已通过并归档）**：TC-N-01 手动开灯（附 1 个已转工程师修复的首页卡片原地刷新缺陷）、TC-N-04 场景批量改多设备、TC-N-05 回寝恢复用户预设（判据亮度 75 因 UI 步进固定 ±10 等价替换为 80，如实标注）、TC-E-01 重复开启返回 `NO_CHANGE` 不写冗余日志。逐用例实际结果与证据路径见 PRD 第 16 章表 5.1。
+
+### 12.3 复跑命令（真实可复现）
+
+```bash
+# L2 纯逻辑断言（Node v22.22.2，无需设备）：gen.js 生成 .gen → DevEco tsc 编译 → 逐桶断言
+node tests/l2/run.js
+
+# L1 命令行构建（输出未签名 HAP）
+scripts\build-hap.bat
+
+# L4 设备端安装 / 启动（API 17 设备，实测原文见 evidence/运行验证报告-模拟器.md）
+hdc install -r entry/build/default/outputs/default/entry-default-unsigned.hap
+hdc shell aa start -a EntryAbility -b com.smartdorm.harmony
+```
+
+### 12.4 已知构建门禁局限（重要）
 
 hvigor 的 `CompileArkTS` **只对入口可达闭包内的文件做类型检查**，未被任何页面/服务引用到的 `.ets` 文件即使类型错误也能 `BUILD SUCCESSFUL`。
-本项目通过"临时类型检查中枢"方式逐轮收口，并在 `evidence/构建日志-阶段三.md` 中如实记录该局限与验证手法，**不把 `BUILD SUCCESSFUL` 当作全量类型正确的证据**。
+本项目通过"临时类型检查中枢"方式逐轮收口，并在 `evidence/构建日志-阶段三.md` 中如实记录该局限与验证手法，**不把 `BUILD SUCCESSFUL` 当作全量类型正确的证据**。阶段四还实测到 1 个仅被 ArkTS 编译器发现、被 tsc 宽松放行的 `arkts-no-untyped-obj-literals` 错误（已修复后重建 0 错误），见 `evidence/阶段四验收报告.md` §2.2。
 
 ---
 
@@ -378,13 +469,18 @@ hvigor 的 `CompileArkTS` **只对入口可达闭包内的文件做类型检查*
 
 | 文档 | 路径 | 说明 |
 | --- | --- | --- |
-| 软件需求说明书 | [`docs/软件需求说明书.md`](docs/软件需求说明书.md) | 12 项成节，含需求池、用例、数据字典、评分映射 |
-| 系统架构设计 | [`design/系统架构设计.md`](design/系统架构设计.md) | 103 条文件清单、接口签名、数据模型、API 17 实测核验清单 |
+| 软件需求说明书 | [`docs/软件需求说明书.md`](docs/软件需求说明书.md) | 12 项成节，含需求池、用例、数据字典、评分映射、第 16 章测试基线 |
+| 系统架构设计 | [`design/系统架构设计.md`](design/系统架构设计.md) | 文件清单、接口签名、数据模型、API 17 实测核验清单 |
 | 类图 / 时序图 | [`design/class-diagram.mermaid`](design/class-diagram.mermaid)、[`design/sequence-diagram.mermaid`](design/sequence-diagram.mermaid) | Mermaid 源文件 |
 | 阶段任务列表 | `design/任务列表-第二/三/四阶段.md` | 任务分解与验收标准 |
-| 测试执行方案 | [`design/测试执行方案-阶段五.md`](design/测试执行方案-阶段五.md) | 22 条用例与执行分桶 |
+| 测试执行方案 | [`design/测试执行方案-阶段五.md`](design/测试执行方案-阶段五.md) | V1.3 口径：L2 / L4 / Previewer 三类分桶与判据 |
 | 环境检查记录 | [`evidence/环境检查记录-阶段一.md`](evidence/环境检查记录-阶段一.md) | 本机实测基线 |
-| 构建日志 | [`evidence/构建日志-阶段二.md`](evidence/构建日志-阶段二.md)、[`evidence/构建日志-阶段三.md`](evidence/构建日志-阶段三.md) | 逐次构建耗时与产物大小 |
+| 构建日志 | [`evidence/构建日志-阶段二.md`](evidence/构建日志-阶段二.md)、[`evidence/构建日志-阶段三.md`](evidence/构建日志-阶段三.md)、`evidence/阶段四-构建日志.txt` | 逐次构建耗时与产物大小 |
+| **阶段四验收报告** | [`evidence/阶段四验收报告.md`](evidence/阶段四验收报告.md) | 代码 / 构建 / 设备端三态终判、12 步重启逐字段比对、降级证据与诚实边界 |
+| **运行验证报告（模拟器）** | [`evidence/运行验证报告-模拟器.md`](evidence/运行验证报告-模拟器.md) | 设备标识、API 17 校验、安装 / 启动、逐页走查与缺陷根因 |
+| **L2 断言输出** | `evidence/l2-阶段四.txt`（282）、`evidence/l2-阶段五.txt`（307） | Node 侧纯逻辑断言原始输出 |
+| **落盘 / 导出证据** | `evidence/prefs_before`、`prefs_after`、`prefs_clean`、`export_before.json`、`export_after.json`、`exp_latest.json` | preferences 原文与导出快照 |
+| **设备端截图索引** | [`screenshots/README.md`](screenshots/README.md) | 采集方式、载体诚实边界、逐文件对照 |
 | 阶段报告 | [`stages/阶段一_环境检查与需求设计.md`](stages/阶段一_环境检查与需求设计.md)、[`stages/阶段二报告.md`](stages/阶段二报告.md) | 各阶段产出与遗留问题 |
 
 ---
@@ -394,12 +490,14 @@ hvigor 的 `CompileArkTS` **只对入口可达闭包内的文件做类型检查*
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | ST-01 | 环境检查与需求设计 | ✅ 完成 |
-| ST-02 | 基础工程与 UI 开发 | ✅ 完成（未真机验证） |
-| ST-03 | 核心业务逻辑（8 对象 / 服务层 / 规则引擎） | ✅ 主体完成，UI 手机断点适配收尾中 |
-| ST-04 | 数据持久化 | ⏳ 进行中 |
-| ST-05 | 测试与修复 | ⏸ 待启动（部分阻塞于设备） |
-| ST-06 | GitHub 与项目文档（含 Word 报告） | ⏳ 仓库已建立，报告待编写 |
+| ST-02 | 基础工程与 UI 开发 | ✅ 完成；API 17 设备端（模拟器）实拍截图已覆盖，物理真机待补测 |
+| ST-03 | 核心业务逻辑（8 对象 / 服务层 / 规则引擎） | ✅ 完成（ST-05 期间仍有 UI 缺陷修复提交） |
+| ST-04 | 数据持久化 | ✅ 完成：代码完成 / 构建通过 / 设备端验证通过（12 步重启验收） |
+| ST-05 | 测试与修复 | ⏳ **进行中**：L2 307 断言 0 失败已完成；L4 第一批 4 用例已通过并归档，第二批执行中；L3 Previewer 走查尚未实跑 |
+| ST-06 | GitHub 与项目文档（含 Word 报告） | ⏳ 进行中：README 已按 DL-04 完成 13 项对齐；Word 报告待编写 |
 | ST-07 | 最终交付 | ⏸ 待启动 |
+
+> 运行载体为 API 17 模拟器 `127.0.0.1:5555`（`OpenHarmony-5.0.5.165`），**非物理真机**；物理真机接入后的补测与 DL-05 连续真实录屏仍待完成，见第 9、10 节。
 
 ---
 
