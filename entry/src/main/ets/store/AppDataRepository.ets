@@ -54,12 +54,12 @@ import { StorageDiagnostics, DiagnosticEntry, DiagnosticLevel } from './StorageD
 
 /** 写面适配器需要的仓储侧能力（用接口而不是直接依赖本类，避免类声明顺序/循环依赖）。 */
 interface PersistenceHost {
-  /** 执行期取内存态快照（§1.2-B：入队时不取）。 */
-  snapshot(): AppState;
+  /** 执行期取内存态快照（§1.2-B：入队时不取）。用属性签名以匹配箭头函数字面量（ArkTS arkts-no-untyped-obj-literals 要求）。 */
+  snapshot: () => AppState;
   /** 当前运行时元信息 JSON（写 `KEY-11` 用，必须是调用时刻的最新值）。 */
-  runtimeJson(): string;
+  runtimeJson: () => string;
   /** 是否允许写回 `KEY-01`：迁移失败（存储版本高于应用版本）时必须为 false。 */
-  allowSchemaWrite(): boolean;
+  allowSchemaWrite: () => boolean;
 }
 
 /**
