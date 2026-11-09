@@ -41,6 +41,9 @@ export interface RangeTable {
 /** 每块 JSON 上限：对 8192 留 14.6% 余量，容纳中文与转义膨胀。 */
 export const CHUNK_MAX_CHARS: number = 7000;
 
+/** 块格式版本（§1.3：块头带 `v`，当前 1）。升级块格式必须同时升 `SCHEMA_VERSION`。 */
+export const CHUNK_FORMAT_VERSION: number = 1;
+
 /** 单条目上限：超过则该条不落盘（内存态保留），避免一条超长日志把整分区写失败。 */
 export const ENTRY_GUARD_CHARS: number = 6500;
 

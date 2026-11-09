@@ -30,6 +30,7 @@ import { AppState } from '../model/AppState';
 import { StoragePartition, ChunkHeader } from './StorageKeys';
 import {
   CHUNK_INDEX_MAX,
+  CHUNK_FORMAT_VERSION,
   FLUSH_DEBOUNCE_LOG_MS,
   FLUSH_DEBOUNCE_USER_MS,
   FLUSH_MAX_PENDING_LOG_WRITES
@@ -89,9 +90,6 @@ export interface QueueStats {
   failures: number;
   lastError: string;
 }
-
-/** 块格式版本（§1.3：块头带 `v`，当前 1；升级块格式必须同时升 `SCHEMA_VERSION`）。 */
-const CHUNK_FORMAT_VERSION: number = 1;
 
 export class WriteQueue {
   private static instance: WriteQueue = new WriteQueue();

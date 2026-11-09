@@ -119,10 +119,36 @@ export class PreferencesStore {
     }
   }
 
+  /**
+   * 键名枚举（加载期计算 `trimChunks` 的观测最大块序号用）。未就绪或异常返回 `[]`。
+   *
+   * ★ **只在 `load()` 里调一次**：`getAllSync()`（声明文件第 1144 行）会把本 store 的全部
+   *   value 一起读出来——本项目日志满载时约 1.3 MB。取完键名**立刻丢弃引用**，绝不缓存整表，
+   *   否则等于在内存里常驻一份全量副本，与「内存是权威、存储是副本」的分工冲突。
+   * ★ 不要退化成「对 `c0000..c9999` 逐个 `hasSync` 探测」：那是一万次系统调用。
+   */
+  allKeys(): string[] {
+    const handle: preferences.Preferences | undefined = this.store;
+    if (handle === undefined) {
+      return [];
+    }
+    try {
+      const all: Object = handle.getAllSync();
+      if (typeof all !== 'object' || all === null) {
+        return [];
+      }
+      const table: Record<string, Object> = all as Record<string, Object>;
+      const keys: string[] = Object.keys(table);
+      return keys;
+    } catch (err) {
+      this.capture(err instanceof Error ? err : undefined);
+      return [];
+    }
+  }
+
   // ——————————————————————————————————————————————————————————
   // 运行异步写（重抛）
   // ——————————————————————————————————————————————————————————
-
   /** 写一个键（分块键或标量键）。失败时记录错误码并**重抛**给 `WriteQueue`。 */
   async put(key: string, json: string): Promise<void> {
     const handle: preferences.Preferences | undefined = this.store;

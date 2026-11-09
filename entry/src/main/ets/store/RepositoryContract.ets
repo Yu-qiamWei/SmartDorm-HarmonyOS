@@ -26,12 +26,23 @@ import { RuleEvaluationReport } from '../model/Reports';
 import { ResetScope, RunMode } from '../model/Enums';
 import { StateChangeHandler, Unsubscribe } from '../common/StateChangeTypes';
 import { StoragePartition } from './StorageKeys';
+import { RuntimeMeta } from './Serializer';
+import { DiagnosticEntry } from './StorageDiagnostics';
 
 /** 对外读契约（页面 / 组件只允许依赖本接口 + subscribe）。 */
 export interface IAppDataRepository {
-  /** MI-15 同步载入内存态；首次启动返回默认数据，逐区失败降级不崩溃。 */
+  /**
+   * MI-15 同步载入内存态；首次启动返回默认数据并立即落盘，非首次读回 + 迁移 + 逐区降级。
+   * `loaded` 幂等：第二次及以后直接返回 `this.state`，不重新读盘、不重新生成默认态。
+   */
   load(): AppState;
-  /** MI-16 串行 flush（可选分区），失败返回 STORAGE_ERROR。阶段三仍未真实落盘（ST-04）。 */
+  /**
+   * MI-16 串行 flush，成功 `OK` / 失败 `STORAGE_ERROR`（不抛异常）。
+   *
+   * ★ `partition` 参数语义 = **先把该分区标记为待写，再整批落盘**，不是「只写该分区」。
+   *   `WriteQueue` 的单链与「一批只 flush 一次」契约要求批次边界由队列决定，
+   *   单分区直写会破坏 §1.2-C 的跨分区一致性（执行日志与 `lastSatisfied` 同批落盘）。
+   */
   flush(partition?: StoragePartition): Promise<CommandResult<void>>;
   /** MI-17 重置；二次确认由 UI 负责；不清空 schemaVersion。 */
   reset(scope: ResetScope): Promise<CommandResult<AppState>>;
@@ -43,6 +54,10 @@ export interface IAppDataRepository {
   listDevices(): Device[];
   /** 护栏 A：规则执行日志唯一提交入口（参数只能是完整求值报告）。 */
   commitRuleLogs(report: RuleEvaluationReport): Promise<CommandResult<void>>;
+  /** 持久化诊断只读快照（设置页诊断区 / 证据文件用）。 */
+  getDiagnostics(): DiagnosticEntry[];
+  /** `KEY-11` 运行时元信息只读快照（`bootCount` 是「读回 vs 重新生成」的最强判据）。 */
+  getRuntimeMeta(): RuntimeMeta;
 }
 
 /**

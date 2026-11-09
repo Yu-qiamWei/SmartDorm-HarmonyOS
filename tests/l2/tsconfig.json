@@ -12,13 +12,21 @@
     "sourceMap": false,
     "declaration": false,
     "noEmitOnError": true,
-    "removeComments": false
+    "removeComments": false,
+    "baseUrl": ".gen/src",
+    "paths": {
+      "@kit.ArkData": ["__stub/kit_arkdata"],
+      "@kit.AbilityKit": ["__stub/kit_abilitykit"],
+      "@kit.BasicServicesKit": ["__stub/kit_basicservices"],
+      "@kit.ArkTS": ["__stub/kit_arkts"]
+    }
   },
   "files": [
     ".gen/src/store/StorageKeys.ts",
     ".gen/src/store/WriteQueue.ts",
     ".gen/src/store/Serializer.ts",
     ".gen/src/store/SchemaMigration.ts",
-    ".gen/src/store/StorageDiagnostics.ts"
+    ".gen/src/store/StorageDiagnostics.ts",
+    ".gen/src/store/AppDataRepository.ts"
   ]
 }

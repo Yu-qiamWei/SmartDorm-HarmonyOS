@@ -18,6 +18,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SRC_DIR = path.join(ROOT, 'entry', 'src', 'main', 'ets');
+const STUB_DIR = path.join(__dirname, 'stubs');
 const GEN_DIR = path.join(__dirname, '.gen');
 
 /** 递归收集 `.ets` 文件（返回绝对路径）。 */
@@ -47,6 +48,15 @@ function main() {
     fs.copyFileSync(file, dest);
   }
   process.stdout.write('[gen] 复制 ' + files.length + ' 个 .ets → .gen/src/**/*.ts\n');
+
+  // 桩：`@kit.*` 在 Node 侧不存在，靠 tsconfig 的 paths 把模块名映射到这几个文件。
+  // 它们只是测试夹具，永不进入 HAP；放在 .gen/src/__stub 下以便落在 rootDir 内。
+  fs.mkdirSync(path.join(GEN_DIR, 'src', '__stub'), { recursive: true });
+  const stubs = fs.readdirSync(STUB_DIR).filter((name) => name.endsWith('.ts'));
+  for (const name of stubs) {
+    fs.copyFileSync(path.join(STUB_DIR, name), path.join(GEN_DIR, 'src', '__stub', name));
+  }
+  process.stdout.write('[gen] 复制 ' + stubs.length + ' 个 @kit 桩 → .gen/src/__stub/*.ts\n');
 }
 
 main();

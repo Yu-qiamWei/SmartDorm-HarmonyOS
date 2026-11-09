@@ -51,12 +51,9 @@ import {
 import { StoragePartition, ChunkHeader } from './StorageKeys';
 import { StorageDiagnostics, DiagnosticLevel } from './StorageDiagnostics';
 import {
-  CHUNK_MAX_CHARS, ENTRY_GUARD_CHARS, CHUNK_INDEX_MAX
+  CHUNK_MAX_CHARS, ENTRY_GUARD_CHARS, CHUNK_INDEX_MAX, CHUNK_FORMAT_VERSION
 } from '../common/Constants';
 import { TimeUtil } from '../common/TimeUtil';
-
-/** 块格式版本。与 `WriteQueue` 内的同名私有常量必须同步；升它必须同时升 `SCHEMA_VERSION`（§1.3）。 */
-const CHUNK_FORMAT_VERSION: number = 1;
 
 /** 运行时元信息结构版本（缺失视为 1）。 */
 const RUNTIME_FORMAT_VERSION: number = 1;
