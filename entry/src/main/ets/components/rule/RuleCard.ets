@@ -29,6 +29,21 @@ const PREVIEW_RULE: AutomationRule = {
 @Component
 @Preview
 export struct RuleCard {
+  /**
+   * ForEach 键值生成器（规则列表页共用）。
+   *
+   * ★ 不能只用 `rule.id`：ArkUI `ForEach` 对键值未变化的数组项复用旧组件、
+   *   不重新执行 itemGenerator，`@Prop rule` 不会更新——规则触发后「累计执行 N 次」
+   *   与边沿徽标会停留在旧值（与首页设备卡片同一根因，QA ST-05 复现类）。
+   *   键里纳入全部会随触发/编辑变化的展示字段：`executionCount`、`lastTriggeredAt`、
+   *   `updatedAt`、`lastSatisfied`，任一变化即整项重建，`@Prop` 拿到新对象。
+   */
+  static keyOf(rule: AutomationRule): string {
+    return rule.id + ':' + String(rule.executionCount) + ':' +
+      String(rule.lastTriggeredAt) + ':' + String(rule.updatedAt) + ':' +
+      (rule.lastSatisfied ? 's1' : 's0');
+  }
+
   @Prop rule: AutomationRule = PREVIEW_RULE;
   /** 启停默认实现：调用 MI-11 契约占位并 Toast 反馈。 */
   onToggle: (ruleId: string, enabled: boolean) => void =

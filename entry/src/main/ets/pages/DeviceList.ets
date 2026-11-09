@@ -174,7 +174,7 @@ struct DeviceList {
                   }
                   .width('100%')
                 }
-              }, (device: Device): string => device.id)
+              }, (device: Device): string => DeviceCard.keyOf(device))
             }
             .width('100%')
           }

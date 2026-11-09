@@ -266,7 +266,7 @@ struct Index {
               GridCol({ span: 1 }) {
                 DeviceCard({ device: device })
               }
-            }, (device: Device): string => device.id)
+            }, (device: Device): string => DeviceCard.keyOf(device))
           }
           .width('100%')
         }

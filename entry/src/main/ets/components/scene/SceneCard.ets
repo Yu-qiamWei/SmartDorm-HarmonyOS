@@ -26,15 +26,27 @@ const PREVIEW_SCENE: Scene = {
 @Component
 @Preview
 export struct SceneCard {
+  /**
+   * ForEach 键值生成器（场景列表页共用）。
+   *
+   * ★ 不能只用 `scene.id`：`active`（是否当前场景）是页面对 `currentSceneId` 的派生值，
+   *   若键值不变，ArkUI `ForEach` 复用旧组件、`@Prop active` 不更新——切换场景后
+   *   「当前场景」高亮会停留在旧卡片上（与首页设备卡片同一根因）。
+   *   把 `active` 纳入键：切换时仅新旧两张卡片重建，其余不动。
+   */
+  static keyOf(scene: Scene, active: boolean): string {
+    return scene.id + ':' + (active ? 'on' : 'off');
+  }
+
   @Prop scene: Scene = PREVIEW_SCENE;
   @Prop active: boolean = false;
-  /** 切换默认实现：调用 MI-14 契约占位，并把执行报告结果数反馈给用户。 */
+  /** 切换默认实现：调用 MI-14 真实场景应用，并把执行报告结果数反馈给用户。 */
   onApply: (sceneId: string) => void = (sceneId: string): void => {
     ServiceFacade.getInstance().applyScene(sceneId)
       .then((report: SceneApplyReport): void => {
         ToastHost.showMessage(
           '场景切换报告：共 ' + report.total + ' 项，成功 ' + report.appliedCount +
-          ' 项，失败 ' + report.failedCount + ' 项（阶段二占位）'
+          ' 项，失败 ' + report.failedCount + ' 项'
         );
       });
   };

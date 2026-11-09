@@ -119,7 +119,7 @@ struct SceneList {
                 scene: scene,
                 active: scene.id === this.currentSceneId
               }).margin({ bottom: ThemeTokens.SPACE_ITEM_GAP })
-            }, (scene: Scene): string => scene.id)
+            }, (scene: Scene): string => SceneCard.keyOf(scene, scene.id === this.currentSceneId))
           }
         }
       }

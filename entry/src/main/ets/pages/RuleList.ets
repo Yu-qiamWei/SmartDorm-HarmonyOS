@@ -118,7 +118,7 @@ struct RuleList {
             ForEach(this.rules, (rule: AutomationRule): void => {
               RuleCard({ rule: rule })
                 .margin({ bottom: ThemeTokens.SPACE_ITEM_GAP })
-            }, (rule: AutomationRule): string => rule.id)
+            }, (rule: AutomationRule): string => RuleCard.keyOf(rule))
           }
         }
       }

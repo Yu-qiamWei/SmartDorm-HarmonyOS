@@ -28,6 +28,24 @@ const PREVIEW_DEVICE: Device = {
 @Component
 @Preview
 export struct DeviceCard {
+  /**
+   * ForEach 键值生成器（首页 / 设备列表共用）。
+   *
+   * ★ 为什么不能用 `device.id` 单独作键：ArkUI `ForEach` 对「键值已存在于旧集合」的数组项
+   *   **复用旧组件且不重新执行 itemGenerator**，`@Prop device` 不会被重新喂入——
+   *   设备开关后卡片就会一直显示旧值，直到页面销毁重建（QA ST-05 实测复现）。
+   *
+   * ★ 为什么键里带 `lastUpdated`：全部设备变更路径（手动 MI-02/03、场景 MI-14、
+   *   规则引擎、诊断置离线）都经 `MockDeviceAdapter.apply/withStatus` 产出**新对象**
+   *   并写入新的 `lastUpdated`（epoch ms），无任何原地修改路径；因此
+   *   「id 不变 + lastUpdated 变化」恰好刻画「该设备渲染内容已变化」，键值变化
+   *   触发该项重建，`@Prop` 拿到新对象，卡片原地更新。未变更设备的键值不变，
+   *   不会引发无关卡片重建。
+   */
+  static keyOf(device: Device): string {
+    return device.id + ':' + String(device.lastUpdated);
+  }
+
   @Prop device: Device = PREVIEW_DEVICE;
   /** 进详情默认实现：真实单栈跳转并携带 deviceId。 */
   onOpenDetail: (deviceId: string) => void = (deviceId: string): void => {
