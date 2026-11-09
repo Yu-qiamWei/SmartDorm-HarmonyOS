@@ -59,7 +59,7 @@ struct SceneList {
 
         SectionCard({
           title: '一键切换',
-          caption: '切换会调用 MI-14 契约占位并返回逐设备执行报告'
+          caption: '切换会按场景目标逐设备应用状态；离寝先保存当前状态快照、回寝按快照恢复，并返回逐设备执行报告'
         }) {
           Row() {
             Button('新建自定义场景')

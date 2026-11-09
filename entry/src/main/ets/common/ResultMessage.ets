@@ -22,10 +22,6 @@ function buildResultMessage(): Record<string, string> {
 
 export const RESULT_MESSAGE: Record<string, string> = buildResultMessage();
 
-/** 阶段二接口占位的统一后缀说明，避免占位被误读为「已经真实执行」。 */
-export const STAGE2_PLACEHOLDER_HINT: string =
-  '阶段二接口占位，业务逻辑将在阶段三接入';
-
 /** 取结果码对应的中文提示；未登记码返回通用提示，不返回 undefined。 */
 export function messageOf(code: string): string {
   const text: string = RESULT_MESSAGE[code];
@@ -33,9 +29,4 @@ export function messageOf(code: string): string {
     return RESULT_MESSAGE['UNKNOWN'];
   }
   return text;
-}
-
-/** 阶段二占位场景的中文提示（原因码 + 占位说明）。 */
-export function stage2Message(code: string): string {
-  return messageOf(code) + '（' + STAGE2_PLACEHOLDER_HINT + '）';
 }

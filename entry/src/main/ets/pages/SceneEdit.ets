@@ -115,14 +115,16 @@ struct SceneEdit {
       facade.updateScene(this.buildScene())
         .then((result: CommandResult<Scene>): void => {
           ToastHost.showResult<Scene>(result);
-          this.saveNote = result.changed ? '已保存' : '阶段二接口占位：未真实写入，草稿已保留';
+          // 未产生变更（幂等成功或失败）时回显真实原因，不写死「占位未实现」
+          // ——与 RuleEdit 的 DEV-02 修复同口径：真实返回码不得被占位文案掩盖。
+          this.saveNote = result.changed ? '已保存' : result.message;
         });
       return;
     }
     facade.createScene(this.sceneName)
       .then((result: CommandResult<Scene>): void => {
         ToastHost.showResult<Scene>(result);
-        this.saveNote = result.changed ? '已保存' : '阶段二接口占位：未真实写入，草稿已保留';
+        this.saveNote = result.changed ? '已保存' : result.message;
       });
   }
 
