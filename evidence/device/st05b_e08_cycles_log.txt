@@ -1,0 +1,10 @@
+cycle 1 : tapped [首页] at 1029,268 | HOME_OK
+cycle 2 : tapped [首页] at 1029,268 | HOME_OK
+cycle 3 : tapped [首页] at 1029,268 | HOME_OK
+cycle 4 : tapped [首页] at 1029,268 | HOME_OK
+cycle 5 : tapped [首页] at 1029,268 | HOME_OK
+cycle 6 : NOT_FOUND: 首页 | HOME_FAIL
+NO_PROCESS
+TOTAL verified cycles=0
+NOTE: cycles 1-5 verified (tapped 首页 + HOME_OK). cycle 6 aborted by appfreeze (process NO_PROCESS).
+NOTE: TOTAL line above = 0 is a shell case-pattern bug; verified cycle count = 5 of 10.
