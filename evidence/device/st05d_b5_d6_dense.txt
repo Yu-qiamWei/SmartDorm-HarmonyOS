@@ -1,0 +1,12 @@
+sample 1 | 待落盘分区 = 0
+sample 2 | 待落盘分区 = 0
+sample 3 | 待落盘分区 = 0
+sample 4 | 待落盘分区 = 0
+sample 5 | 待落盘分区 = 0
+sample 6 | 待落盘分区 = 0
+sample 7 | 待落盘分区 = 0
+sample 8 | 待落盘分区 = 0
+sample 9 | 待落盘分区 = 0
+sample 10 | 待落盘分区 = 0
+sample 11 | 待落盘分区 = 0
+sample 12 | 待落盘分区 = 0

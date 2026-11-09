@@ -28,6 +28,15 @@ import { LineChart } from '../components/chart/LineChart';
 import { BarChart } from '../components/chart/BarChart';
 import { ToastHost } from '../components/common/ToastHost';
 
+/**
+ * UI 层「历史记录筛选」列表最多渲染的行数。
+ *
+ * 与 Environment 页同一治理口径（ST-05 P0 appfreeze）：四类日志中环境日志可达 2000 条，
+ * 普通 `ForEach` 全量建节点会在切到「环境记录」tab 时阻塞 UI 线程。
+ * 全量数据仍在 store / 导出中，视图层只做「最近 N 条 + 明确提示总数」。
+ */
+const VISIBLE_RECORD_LIMIT: number = 30;
+
 interface LogTab {
   label: string;
   type: LogType;
@@ -51,6 +60,10 @@ struct Statistics {
   @State envCount: number = 0;
   @State sceneCount: number = 0;
   @State chartColumns: number = ThemeTokens.GRID_CHARTS_PHONE;
+  /** 当前筛选下真正交给 ForEach 的行（≤ VISIBLE_RECORD_LIMIT）。 */
+  @State recordLines: string[] = [];
+  /** 当前筛选下的全量行数，用于 caption 明确告知截断。 */
+  @State recordTotal: number = 0;
 
   private unsubscribe: Unsubscribe | undefined = undefined;
   private mediaListener: mediaquery.MediaQueryListener | undefined = undefined;
@@ -127,6 +140,25 @@ struct Statistics {
     // 第三张图：按设备类型分组统计真实操作次数（形参 groupBy 仅为兼容旧签名，不参与计算）
     this.deviceBarModel = facade.buildBarModel(state.logs.operations, 'deviceType');
     this.successRateValue = facade.successRate(state.logs.ruleExecutions);
+    this.updateRecords();
+  }
+
+  /** 从全量日志生成「展示行切片」；全量数据不删、不截断 store。 */
+  private updateRecords(): void {
+    const all: string[] = this.selectedRecords();
+    this.recordTotal = all.length;
+    const start: number = all.length > VISIBLE_RECORD_LIMIT
+      ? all.length - VISIBLE_RECORD_LIMIT : 0;
+    this.recordLines = all.slice(start);
+  }
+
+  /** 截断必须可见：总数、显示数、完整数据获取途径一并告知。 */
+  private recordCaption(): string {
+    if (this.recordTotal <= VISIBLE_RECORD_LIMIT) {
+      return '当前筛选：' + this.selectedType + ' · 共 ' + this.recordTotal + ' 条（全部显示）';
+    }
+    return '当前筛选：' + this.selectedType + ' · 共 ' + this.recordTotal + ' 条，仅显示最近 ' +
+      this.recordLines.length + ' 条，完整数据见导出';
   }
 
   /** 按选中类型读取真实日志并转成展示行（避免 UI 直接访问判别联合的非共有字段）。 */
@@ -224,31 +256,33 @@ struct Statistics {
                   .width('100%')
                   .onClick(() => {
                     this.selectedType = tab.type;
+                    this.updateRecords();
                     ToastHost.showMessage('已筛选：' + tab.label);
                   })
               }
             }, (tab: LogTab): string => tab.type)
           }
           .width('100%')
-          Text('当前筛选：' + this.selectedType + ' · 共 ' + this.selectedRecords().length + ' 条')
+          Text(this.recordCaption())
             .fontSize(ThemeTokens.FONT_CAPTION)
             .fontColor(ThemeTokens.TEXT_HINT)
             .width('100%')
             .margin({ top: ThemeTokens.SPACE_ITEM_GAP })
-          if (this.selectedRecords().length === 0) {
+          if (this.recordLines.length === 0) {
             Text('暂无该类记录（系统不预置演示日志，真实操作后产生）')
               .fontSize(ThemeTokens.FONT_BODY)
               .fontColor(ThemeTokens.TEXT_SECONDARY)
               .width('100%')
               .margin({ top: ThemeTokens.SPACE_ITEM_GAP })
           } else {
-            ForEach(this.selectedRecords(), (line: string, index: number): void => {
+            ForEach(this.recordLines, (line: string, index: number): void => {
               Text(line)
                 .fontSize(ThemeTokens.FONT_BODY)
                 .fontColor(ThemeTokens.TEXT_PRIMARY)
                 .width('100%')
                 .padding({ top: 6, bottom: 6 })
-            }, (line: string, index: number): string => 'record_' + index)
+            }, (line: string, index: number): string =>
+              'record_' + index + '_' + this.selectedType + '_' + line)
           }
         }
       }

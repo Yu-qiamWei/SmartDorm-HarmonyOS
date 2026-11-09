@@ -26,6 +26,28 @@ interface ModuleEntry {
   caption: string;
 }
 
+/**
+ * @Builder 按引用传递的载体（ArkUI 严格模式要求显式 interface，不能用未类型化对象字面量）。
+ *
+ * ★ 为什么不能用 `@Builder f(label: string, value: string, unit: string)` 的按值形参：
+ *   ArkUI 对 @Builder 的按值参数不建立状态依赖，父组件 @State 变化时 builder 内部
+ *   的 Text **不会重绘** —— 这正是「用系统 Back 返回首页后在线/异常数停在旧值、
+ *   连『刷新聚合数值』都无效，只有重建实例才正确」的另一条根因。
+ *   按引用传递（对象字面量 + 直接放进 @State 变量）才会随状态变化刷新。
+ */
+interface OverviewCellData {
+  label: string;
+  value: number;
+  unit: string;
+}
+
+interface MetricCellData {
+  label: string;
+  value: number;
+  mode: string;
+  color: string;
+}
+
 @Entry
 @Component
 struct Index {
@@ -67,11 +89,33 @@ struct Index {
     this.refresh();
   };
 
+  /**
+   * 保证「订阅 + 断点监听」都处于已注册状态（幂等）。
+   *
+   * ★ `router.back()` 复用页面栈中的缓存实例，不重走 `aboutToAppear()`；而
+   *   `aboutToDisappear()` 在本工程实测会在页面被覆盖时退订。二者叠加会让首页
+   *   成为「没有订阅者」的僵尸实例：内存态变了、@State 没变，按刷新按钮也没用。
+   *   所有注册入口统一走本方法，`undefined` 才注册，绝不产生重复订阅/重复定时器。
+   */
+  private ensureSubscriptions(): void {
+    if (this.mediaListener === undefined) {
+      this.mediaListener = mediaquery.matchMediaSync(ThemeTokens.tabletQuery());
+      this.mediaListener.on('change', this.onMediaChange);
+      this.applyBreakpoint(this.mediaListener.matches);
+    }
+    if (this.unsubscribe === undefined) {
+      this.unsubscribe = AppDataRepository.getInstance().subscribe(this.onStateChange);
+    }
+  }
+
+  /** 页面（含被 router.back 重新显示的缓存实例）每次显示都重新订阅并按权威内存态刷新。 */
+  onPageShow(): void {
+    this.ensureSubscriptions();
+    this.refresh();
+  }
+
   aboutToAppear(): void {
-    this.mediaListener = mediaquery.matchMediaSync(ThemeTokens.tabletQuery());
-    this.applyBreakpoint(this.mediaListener.matches);
-    this.mediaListener.on('change', this.onMediaChange);
-    this.unsubscribe = AppDataRepository.getInstance().subscribe(this.onStateChange);
+    this.ensureSubscriptions();
     this.refresh();
   }
 
@@ -129,12 +173,12 @@ struct Index {
   }
 
   @Builder
-  overviewCell(label: string, value: string, unit: string) {
+  overviewCell(cell: OverviewCellData) {
     Column() {
-      Text(label)
+      Text(cell.label)
         .fontSize(ThemeTokens.FONT_CAPTION)
         .fontColor(ThemeTokens.TEXT_SECONDARY)
-      Text(value + unit)
+      Text(String(cell.value) + cell.unit)
         .fontSize(ThemeTokens.FONT_TITLE_MEDIUM)
         .fontWeight(FontWeight.Bold)
         .fontColor(ThemeTokens.PRIMARY)
@@ -156,13 +200,13 @@ struct Index {
   }
 
   @Builder
-  metricCell(label: string, value: string, color: string) {
+  metricCell(cell: MetricCellData) {
     Column() {
-      Text(value)
+      Text(cell.mode.length > 0 ? this.modeLabel(cell.mode) : String(cell.value))
         .fontSize(ThemeTokens.FONT_TITLE_LARGE)
         .fontWeight(FontWeight.Bold)
-        .fontColor(color)
-      Text(label)
+        .fontColor(cell.color)
+      Text(cell.label)
         .fontSize(ThemeTokens.FONT_CAPTION)
         .fontColor(ThemeTokens.TEXT_SECONDARY)
         .margin({ top: 4 })
@@ -187,10 +231,10 @@ struct Index {
         // —— 环境概览 4 项（FR-01-01）——
         SectionCard({ title: '环境概览', caption: '数据来自 EnvironmentData 实时内存态' }) {
           Row() {
-            this.overviewCell('温度', String(this.temperature), '℃')
-            this.overviewCell('湿度', String(this.humidity), '%RH')
-            this.overviewCell('光照', String(this.illuminance), 'Lux')
-            this.overviewCell('空气质量', String(this.airQuality), 'AQI')
+            this.overviewCell({ label: '温度', value: this.temperature, unit: '℃' })
+            this.overviewCell({ label: '湿度', value: this.humidity, unit: '%RH' })
+            this.overviewCell({ label: '光照', value: this.illuminance, unit: 'Lux' })
+            this.overviewCell({ label: '空气质量', value: this.airQuality, unit: 'AQI' })
           }
           .width('100%')
         }
@@ -198,10 +242,10 @@ struct Index {
         // —— 聚合统计（FR-01-02 / FR-01-06）——
         SectionCard({ title: '设备与规则', caption: '异常设备数由 FAULT / OFFLINE / 离线真实计数' }) {
           Row() {
-            this.metricCell('在线设备', String(this.onlineCount), ThemeTokens.STATUS_RUNNING)
-            this.metricCell('异常设备', String(this.abnormalCount), ThemeTokens.STATUS_FAULT)
-            this.metricCell('规则数', String(this.ruleCount), ThemeTokens.PRIMARY)
-            this.metricCell('运行模式', this.modeLabel(this.currentMode), ThemeTokens.ACCENT)
+            this.metricCell({ label: '在线设备', value: this.onlineCount, mode: '', color: ThemeTokens.STATUS_RUNNING })
+            this.metricCell({ label: '异常设备', value: this.abnormalCount, mode: '', color: ThemeTokens.STATUS_FAULT })
+            this.metricCell({ label: '规则数', value: this.ruleCount, mode: '', color: ThemeTokens.PRIMARY })
+            this.metricCell({ label: '运行模式', value: 0, mode: this.currentMode, color: ThemeTokens.ACCENT })
           }
           .width('100%')
           Row() {

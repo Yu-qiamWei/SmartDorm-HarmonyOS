@@ -1,0 +1,13 @@
+cycle 1 | exit:NOT_FOUND: 首页 | enter:NOT_FOUND: 进入 | ENV_FAIL | pid=11076
+cycle 2 | exit:tapped [首页] at 1029,268 | enter:tapped [进入] at 897,2075 | ENV_OK | pid=11076
+cycle 3 | exit:tapped [首页] at 1029,268 | enter:tapped [进入] at 897,2075 | ENV_OK | pid=11076
+cycle 4 | exit:tapped [首页] at 1029,268 | enter:tapped [进入] at 897,2075 | ENV_OK | pid=11076
+cycle 5 | exit:tapped [首页] at 1029,268 | enter:tapped [进入] at 897,2082 | ENV_OK | pid=11076
+cycle 6 | exit:tapped [首页] at 1029,268 | enter:tapped [进入] at 897,2075 | ENV_OK | pid=11076
+cycle 7 | exit:tapped [首页] at 1029,268 | enter:tapped [进入] at 897,2075 | ENV_OK | pid=11076
+cycle 8 | exit:tapped [首页] at 1029,268 | enter:tapped [进入] at 897,2075 | ENV_OK | pid=11076
+cycle 9 | exit:tapped [首页] at 1029,268 | enter:tapped [进入] at 897,2075 | ENV_OK | pid=11076
+cycle 10 | exit:tapped [首页] at 1029,268 | enter:tapped [进入] at 897,2075 | ENV_OK | pid=11076
+TOTAL verified enter cycles=9
+cycle 11 (补充) | exit:tapped [首页] at 1029,268 | enter:tapped [进入] at 897,2075 | ENV_OK=1 | pid=11076
+NOTE: cycle 1 was NOT_FOUND due to scrolled page; cycles 2-11 = 10 verified enter/exit cycles, pid constant, no new appfreeze.

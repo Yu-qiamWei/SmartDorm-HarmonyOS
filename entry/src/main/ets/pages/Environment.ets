@@ -21,6 +21,21 @@ import { SectionCard } from '../components/common/SectionCard';
 import { SensorCard } from '../components/env/SensorCard';
 import { ToastHost } from '../components/common/ToastHost';
 
+/**
+ * UI 层「环境历史记录」最多渲染的条数。
+ *
+ * ★ 为什么必须有这个上限（ST-05 TC-E-08 P0 appfreeze 根因修复）：
+ *   `state.logs.environment` 受 FIFO 上限约束最多 2000 条；普通 `ForEach` 会为
+ *   **每一条**创建一组 Row/Text 节点。进入本页时一次性创建 2000 个节点，叠加
+ *   4 秒采样 tick 触发订阅刷新后的整批 diff/重绘，UI 线程被阻塞 2~6 秒，
+ *   系统以 `THREAD_BLOCK_6S` 判定 appfreeze 并杀死进程（QA 实测 4 次）。
+ *
+ * ★ 只约束**视图层**：`AppDataRepository`、`Fifo`、导出路径里的全量日志一条不动，
+ *   `AppSettings.logLimit` 也不改；用户通过 caption 明确看到「共 X 条 / 仅显示最近 N 条 /
+ *   完整数据见导出」，不是静默截断。
+ */
+const VISIBLE_LOG_LIMIT: number = 30;
+
 @Entry
 @Component
 struct Environment {
@@ -30,7 +45,10 @@ struct Environment {
   @State airQuality: number = 50;
   @State humanPresence: boolean = false;
   @State simulationOn: boolean = true;
-  @State logs: EnvironmentLog[] = [];
+  /** 仅承载「最近 VISIBLE_LOG_LIMIT 条」用于渲染，绝不回写 store。 */
+  @State visibleLogs: EnvironmentLog[] = [];
+  /** 全量条数（含未显示的），用于向用户说明截断，不允许静默丢弃。 */
+  @State totalLogCount: number = 0;
   @State lastReport: string = '尚未请求求值报告';
 
   private unsubscribe: Unsubscribe | undefined = undefined;
@@ -59,7 +77,22 @@ struct Environment {
     this.airQuality = env.airQuality;
     this.humanPresence = env.humanPresence;
     this.simulationOn = state.settings.simulationEnabled;
-    this.logs = state.logs.environment.slice();
+    // 视图层切片：全量日志仍由 store / 导出持有，这里只取最近 N 条交给 ForEach。
+    // 每次采样 tick 只会有 1 条新日志进入切片，节点规模恒定 ≤ VISIBLE_LOG_LIMIT。
+    const allLogs: EnvironmentLog[] = state.logs.environment;
+    this.totalLogCount = allLogs.length;
+    const start: number = allLogs.length > VISIBLE_LOG_LIMIT
+      ? allLogs.length - VISIBLE_LOG_LIMIT : 0;
+    this.visibleLogs = allLogs.slice(start);
+  }
+
+  /** 截断必须可见：明确告知全量条数、当前显示条数与完整数据获取途径。 */
+  private logCaption(): string {
+    if (this.totalLogCount <= VISIBLE_LOG_LIMIT) {
+      return '来自真实 EnvironmentLog · 共 ' + this.totalLogCount + ' 条（已全部显示）';
+    }
+    return '来自真实 EnvironmentLog · 共 ' + this.totalLogCount + ' 条，仅显示最近 ' +
+      this.visibleLogs.length + ' 条，完整数据见导出';
   }
 
   private toggleSimulation(): void {
@@ -74,7 +107,11 @@ struct Environment {
     };
     const result: CommandResult<AppSettings> =
       ServiceFacade.getInstance().updateSettings(updated);
-    this.simulationOn = !this.simulationOn;
+    // ★ 不能再翻局部态：updateSettings → commitSettings → notify 是**同步**的，
+    //   refresh() 已把 simulationOn 回填成权威值；再翻一次会变成相反值
+    //   （ST-05 阶段 B D-3：关模拟后按钮仍显示「关闭环境模拟」）。
+    //   显式再读一次权威态，同时覆盖 NO_CHANGE（未触发 notify）分支。
+    this.refresh();
     ToastHost.showResult<AppSettings>(result);
   }
 
@@ -241,14 +278,14 @@ struct Environment {
           .width('100%')
         }
 
-        SectionCard({ title: '环境历史记录', caption: '来自真实 EnvironmentLog' }) {
-          if (this.logs.length === 0) {
+        SectionCard({ title: '环境历史记录', caption: this.logCaption() }) {
+          if (this.visibleLogs.length === 0) {
             Text('暂无环境变化记录（调整传感器后由 ST-03 写入）')
               .fontSize(ThemeTokens.FONT_BODY)
               .fontColor(ThemeTokens.TEXT_SECONDARY)
               .width('100%')
           } else {
-            ForEach(this.logs, (log: EnvironmentLog): void => {
+            ForEach(this.visibleLogs, (log: EnvironmentLog): void => {
               Row() {
                 Text(TimeUtil.format(log.timestamp))
                   .fontSize(ThemeTokens.FONT_CAPTION)

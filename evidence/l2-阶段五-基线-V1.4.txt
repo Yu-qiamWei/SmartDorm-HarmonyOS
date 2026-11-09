@@ -1,0 +1,346 @@
+=== ST-05 L2 基线复核（V1.4） ===
+执行命令: node tests/l2/run.js
+执行目录: D:/SmartDormHarmonyOS
+时间: 2026-11-09 20:53:38 +0800
+HEAD: d3222c6
+Node: v22.22.2
+说明: run.js 依次执行 gen.js → DevEco 自带 tsc(4.9.5) 编译 → 7 个断言文件
+=== 完整输出原文开始 ===
+== 1/3 生成 .gen/src（.ets → .ts，仅改扩展名）==
+[gen] 复制 75 个 .ets → .gen/src/**/*.ts
+[gen] 复制 5 个 @kit 桩 → .gen/src/__stub/*.ts
+== 2/3 tsc 编译（strict, commonjs, ES2021）==
+== 3/3 执行断言 ==
+[A2] StorageKeys 分块键工具
+  PASS  chunkKey(base, 3) === base + ".c0003"
+  PASS  chunkKey(base, 0) === base + ".c0000"
+  PASS  chunkKey(base, 199) === base + ".c0199"
+  PASS  chunkKey(base, CHUNK_INDEX_MAX) === base + ".c9999"
+  PASS  chunkKey(base, CHUNK_INDEX_MAX + 1) 抛错
+  PASS  chunkKey(base, -1) 抛错
+  PASS  chunkKey(base, 1.5) 抛错
+  PASS  headerKey(base) === base + ".hdr"
+  PASS  chunkIndexOf(base.c0003, base) === 3
+  PASS  chunkIndexOf(base.c9999, base) === 9999
+  PASS  chunkIndexOf 与 chunkKey 互为逆运算（0..12 全等）
+  PASS  边界 ① base.hdr → -1
+  PASS  边界 ② base.c12（位数不足）→ -1
+  PASS  边界 ② base.c00001（5 位）→ -1
+  PASS  边界 ③ otherBase.c0001 → -1
+  PASS  边界 ③ base 前缀被更长基键吞掉（operation vs operation2）→ -1
+  PASS  边界 ④ base.c00a1（非数字后缀）→ -1
+  PASS  边界 ④ base.c-001（含负号）→ -1
+  PASS  基键本身 → -1
+  PASS  baseOfPartition(DEVICES)
+  PASS  baseOfPartition(RULES)
+  PASS  baseOfPartition(SCENES)
+  PASS  baseOfPartition(SETTINGS)
+  PASS  baseOfPartition(ENVIRONMENT)
+  PASS  baseOfPartition(OPERATION_LOGS)
+  PASS  baseOfPartition(RULE_EXEC_LOGS)
+  PASS  baseOfPartition(ENVIRONMENT_LOGS)
+  PASS  baseOfPartition(RETURN_SNAPSHOT)
+  PASS  baseOfPartition(META) 防御性默认 KEY_01
+  PASS  isChunked(META) === false
+  PASS  isChunked(DEVICES) === true
+  PASS  isChunked(RETURN_SNAPSHOT) === true
+  PASS  SCALAR_KEYS 长度 2
+  PASS  SCALAR_KEYS 含 KEY-01 与 KEY-11
+  PASS  CHUNKED_BASES 长度 9
+  PASS  ALL 长度 11（KEY-01..KEY-11）
+  PASS  KEY_11_RUNTIME === smartdorm.meta.runtime
+  PASS  ALL 无重复键
+  PASS  基键本身不在 CHUNKED_BASES 与 SCALAR_KEYS 之外出现遗漏
+  PASS  最长派生键 ≤ 40 字符（自定预算 60，SDK 上限 80）
+[A2] 40 passed, 0 failed
+[A3] 合并与重入去重
+  PASS  5 次 mark 后 pendingPartitions 只有 1 个分区
+  PASS  5 次 mark 只产生 1 个写周期
+  PASS  flushOnce 只调用 1 次
+  PASS  写完后 pendingPartitions 为空
+  PASS  debounce 定时器未产生额外写周期
+  PASS  flushNow 重入返回同一 Promise 实例
+  PASS  重入未重复写（累计 2 个周期）
+[A4] 写失败保持 dirty
+  PASS  失败分区 DEVICES 仍在 pendingPartitions 中
+  PASS  成功分区 RULES 已移出 pendingPartitions
+  PASS  stats().failures === 1
+  PASS  stats().lastError 含分区名
+  PASS  块头只写给了 RULES
+  PASS  failStreak() === 1
+  PASS  flushOnce 失败 → 两个分区都保持 dirty
+  PASS  flushOnce 失败 → failures 记为 1
+  PASS  重试成功后 pendingPartitions 清空
+  PASS  重试成功后 failStreak 清零
+[A7] 写入顺序与单批 flushOnce
+  PASS  单分区顺序：chunks → header → trim → flush
+  PASS  多分区批次只在末尾出现 1 次 flushOnce
+  PASS  flushOnce 是最后一步
+  PASS  每个分区都是 chunks → header → trim
+  PASS  块头 n === 块数
+  PASS  块头 v === 1（块格式版本）
+  PASS  块头 p === 分区
+  PASS  块头 t 为有效时间戳
+[A8] 块收缩后键数 = 块头 n + 1
+  PASS  第一次写 3 块 → 键数 4（= n + 1）
+  PASS  第一次写后无残块
+  PASS  第二次写块头 n === 1
+  PASS  第二次写后键数 2（= n + 1）
+  PASS  第二次写后不存在索引 ≥ n 的残块
+  PASS  trimChunks 幂等
+[附加] 两车道触发
+  PASS  用户车道 200 ms 后自动落盘 1 次
+  PASS  日志车道累计 20 次写先到者触发 1 次
+  PASS  未装配时保留 dirty
+  PASS  未装配时 failures 记为 1
+[A3/A4/A7/A8] 35 passed, 0 failed
+[B2] 2000 条环境日志：块长上限与逐条往返
+  PASS  分块生效（块数 > 1）
+  PASS  每一块 length <= CHUNK_MAX_CHARS(7000)
+  PASS  totalEntries = 2000
+  PASS  droppedEntries = 0
+  PASS  error 为空
+  PASS  块头 n = 块数
+  PASS  解码 ok
+  PASS  解码条数 = 2000
+  PASS  解码 dropped = 0
+  PASS  2000 条逐条逐字段相等（顺序不变）
+[B3/E1] 单条守卫边界（6500 / 6501 / 7000 字符）
+  PASS  E1 构造条目长度 6500
+  PASS  E1 构造条目长度 6501
+  PASS  E1 droppedEntries = 1（只有 6501 被丢）
+  PASS  E1 totalEntries = 2
+  PASS  E1 解码条数 = 1
+  PASS  E1 保留的是 6500 那条
+  PASS  B3 droppedEntries = 1
+  PASS  B3 totalEntries = 3
+  PASS  B3 解码 ok
+  PASS  B3 其余 2 条完整
+  PASS  B3 内容是原第 1、3 条
+  PASS  B3 产生 ENTRY_DROPPED 诊断
+[E2] 块边界：恰好填满 vs 溢出 1 字符
+  PASS  E2 单条构造长度 = 200
+  PASS  探测到「一块最多 34 条」的边界
+  PASS  恰好装下的条数 → 1 块
+  PASS  恰好装下 → 全部条目往返
+  PASS  补满 slack 后仍是 1 块
+  PASS  补满后块长正好 = CHUNK_MAX_CHARS
+  PASS  补满后条目全部往返
+  PASS  再多 1 个字符 → 2 块
+  PASS  2 块拼回条数不变
+  PASS  2 块拼回顺序不变
+  PASS  2 块拼回后每块仍 ≤ CHUNK_MAX_CHARS
+  PASS  溢出块只装 1 条
+[往返] 每个分区都编码→解码逐字段相等
+  PASS  DEVICES ok
+  PASS  DEVICES 往返
+  PASS  RULES ok
+  PASS  RULES 往返（含 lastSatisfied）
+  PASS  SCENES ok
+  PASS  SCENES 往返（scenes）
+  PASS  SCENES 往返（sceneSwitches 同区）
+  PASS  SETTINGS ok
+  PASS  SETTINGS 往返（单对象单元素数组）
+  PASS  SETTINGS 单块单条
+  PASS  ENVIRONMENT ok
+  PASS  ENVIRONMENT 往返
+  PASS  OPERATION_LOGS 往返
+  PASS  RULE_EXEC_LOGS ok
+  PASS  RULE_EXEC_LOGS 往返（含 snapshot/动作明细）
+  PASS  RETURN_SNAPSHOT ok
+  PASS  RETURN_SNAPSHOT 往返
+  PASS  META 拒绝经 encodePartition
+  PASS  META 无块
+  PASS  decodeRuntime ok
+  PASS  RuntimeMeta 往返
+  PASS  defaultRuntime bootCount = 1
+  PASS  defaultRuntime currentMode = MANUAL
+  PASS  defaultRuntime firstLaunchAt = now
+[B4/B9/B10/B11/B13] 块数与块头一致性（1.1.3 ①②③④）
+  PASS  前置：至少 5 块可用
+  PASS  B4 ok = false
+  PASS  B4 error 非空
+  PASS  B4 data 不返回
+  PASS  B9 ok = false（缺块＝损坏）
+  PASS  B9 error 含 CHUNK_MISSING
+  PASS  B10 ok = true（多余块不判损坏）
+  PASS  B10 error 为空
+  PASS  B10 产生 1 条 INFO 诊断
+  PASS  B10 诊断细节含孤儿块数
+  PASS  B10 只解析前 3 块（条数 < 全量）
+  PASS  B11 ok = false（有块无头）
+  PASS  B11 error 含 HEADER_MISSING
+  PASS  B13 ok = false（不猜未来格式）
+  PASS  B13 error 含 HEADER_VERSION
+  PASS  空分区 ok = false 且 error 以 EMPTY 开头
+  PASS  EMPTY 与 HEADER_MISSING 可区分（调用方据此判「首次启动」vs「损坏」）
+[B5] 损坏 JSON / 类型不符 / 缺字段：逐分区独立
+  PASS  坏 JSON → ok false
+  PASS  坏 JSON → error 非空
+  PASS  字段类型不符（id 是数字）→ ok false
+  PASS  缺字段（无 name）→ ok false
+  PASS  params.kind 与 type 不一致 → ok false
+  PASS  未知枚举 status=WEIRD → ok false
+  PASS  RULE_EXEC_LOGS 坏一条 → ok false
+  PASS  同时 DEVICES 仍 ok（互不牵连）
+  PASS  DEVICES 条数 6
+  PASS  分区不匹配的块 → ok false
+  PASS  分区不匹配 error 含 CHUNK_PARTITION
+[B6] decodeSchemaVersion
+  PASS  decodeSchemaVersion('') = 0
+  PASS  decodeSchemaVersion('1') = 1
+  PASS  decodeSchemaVersion('abc') = 0
+  PASS  decodeSchemaVersion('-1') = 0
+  PASS  decodeSchemaVersion('1.5') = 0
+  PASS  decodeSchemaVersion('9999999999999') = 0
+  PASS  decodeSchemaVersion('007') = 7（纯数字按数值）
+  PASS  decodeSchemaVersion('12abc') = 0（不学 parseInt 的前缀截断）
+[B12] 加载期守卫：块内混入 1 条超长条目
+  PASS  手工块长度已超过 CHUNK_MAX_CHARS（模拟旧版本写入的块）
+  PASS  ok = true（守卫丢弃不算损坏）
+  PASS  dropped = 1
+  PASS  其余条目完整（1 条）
+  PASS  保留的是原第 1 条
+  PASS  诊断里 ENTRY_SKIPPED 计数为 1
+  PASS  诊断级别 INFO（不是 ERROR/WARN）
+[B2/B3/B4/B5/B6/B9/B10/B11/B12/B13 + E1/E2] 101 passed, 0 failed
+[B7] SchemaMigration
+  PASS  TARGET === SCHEMA_VERSION（同源，不另立常量）
+  PASS  migrate(state, 1).migrated === false
+  PASS  migrate(state, 1).error === ''
+  PASS  migrate(state, 1).toVersion === 1
+  PASS  migrate(state, 1).fromVersion === 1
+  PASS  同版本返回同一对象（不做无谓拷贝）
+  PASS  migrate(state, 0).toVersion === 1
+  PASS  migrate(state, 0).fromVersion === 0
+  PASS  migrate(state, 0).migrated === true
+  PASS  migrate(state, 0).error === ''
+  PASS  迁移后 schemaVersion === 1
+  PASS  迁移保留 devices 条数
+  PASS  迁移不改入参对象（原 schemaVersion 仍为 0）
+  PASS  migrate(state, 99).migrated === false
+  PASS  migrate(state, 99).error 非空
+  PASS  migrate(state, 99).toVersion === 1
+  PASS  migrate(state, 99).fromVersion === 99
+  PASS  版本倒退时数据原样保留（条数不变）
+  PASS  版本倒退时不改 schemaVersion（不得把旧数据标成新版本）
+  PASS  版本倒退返回同一对象
+  PASS  devices 缺失 → []
+  PASS  rules 缺失 → []
+  PASS  scenes 缺失 → []
+  PASS  returnSnapshot 缺失 → []
+  PASS  logs 缺失 → 四个数组都补齐
+  PASS  settings 缺失 → 默认采样间隔 4000
+  PASS  settings 缺失 → 默认日志上限 1000
+  PASS  environment 缺失 → 默认温度 25
+  PASS  currentMode 非法 → MANUAL
+  PASS  currentSceneId 缺失 → ''
+  PASS  schemaVersion 补齐为 1
+  PASS  迁移不删合法执行日志
+  PASS  迁移保留合法 currentMode
+  PASS  迁移保留 currentSceneId
+[B7] 34 passed, 0 failed
+[B8] StorageDiagnostics 环形缓冲
+  PASS  清空后 size = 0
+  PASS  写 60 条后 size = DIAGNOSTIC_CAPACITY(50)
+  PASS  DIAGNOSTIC_CAPACITY = 50
+  PASS  list() 条数 = 50
+  PASS  保留最新的 50 条：首条 seq = 11
+  PASS  末条 seq = 60
+  PASS  list() 按 seq 升序
+  PASS  首条 code = CODE_11（最旧的 10 条已淘汰）
+  PASS  级别保留正确（第 12 条 % 3 == 0 → ERROR）
+  PASS  timestamp 为有效时间戳
+  PASS  外部改动不影响内部（code）
+  PASS  外部改动不影响内部（条数）
+  PASS  clear() 后 size = 0
+  PASS  clear() 后 seq 继续递增 = 61
+  PASS  正好 50 条不淘汰
+  PASS  第 51 条触发淘汰（仍为 50）
+  PASS  淘汰的是最旧一条
+[B8] 17 passed, 0 failed
+  PASS  C0-a PreferencesStore.init 后 isReady() 为真（桩句柄可用）
+  PASS  C0-b 首启 load() 返回默认态：6 个设备
+  PASS  C0-c 首启 load() 返回默认态：4 个预置场景
+  PASS  C0-d 首启 bootCount = 1
+  PASS  C0-e 首启 rules 为空（护栏 A-6：不预置演示规则）
+  PASS  C0-f 首启 ruleExecutions 为空（护栏 A-6：不预置执行日志）
+  PASS  C0-g schemaVersion 已写为当前版本
+  PASS  C0-h 首启后 10 个分区全部待落盘（load 只 mark 不 await）
+  PASS  C0-i 首启时磁盘为空（load 未阻塞落盘，此刻还没写）
+  PASS  C0-j 诊断含 LOAD_DONE 且首启=true
+  PASS  C0-k 诊断含 LOAD_ENUM（allKeys 走 getAllSync 一次取键，不是逐键探测）
+  PASS  C10-a 落盘失败返回 STORAGE_ERROR
+  PASS  C10-b 落盘失败 success = false
+  PASS  C10-c message 非空（沿用 messageOf(STORAGE_ERROR)，不新造文案）
+  PASS  C10-d 失败后 getState() 与失败前逐字段完全一致
+  PASS  C10-e 失败后 10 个分区仍全部 dirty（dirty 只在 flushOnce 成功后删）
+  PASS  C10-f 失败后 dirty 集合仍含 DEVICES / RULES / RULE_EXEC_LOGS
+  PASS  C10-g 失败后 failStreak = 1
+  PASS  C10-h 失败后 failures 计数 +1
+  PASS  C10-i lastError 记录 FLUSH_FAILED 且带原因
+  PASS  C10-j 失败后磁盘仍为空（flush 抛出，内存未落到磁盘）
+  PASS  C10-k 失败被诊断层记录（FLUSH_FAILED，ERROR 级）
+  PASS  C10b-a 第 2 次失败仍返回 STORAGE_ERROR
+  PASS  C10b-b 第 2 次失败后 failStreak = 2
+  PASS  C10b-c 第 3 次失败仍返回 STORAGE_ERROR
+  PASS  C10b-d 第 3 次失败后 failStreak = 3（连续失败不因中途 write 成功而归零）
+  PASS  C10b-e 三次失败后 failures 累计 +3
+  PASS  C10b-f 三次失败后 10 个分区始终未被清掉
+  PASS  C10b-g 三次失败期间内存态始终未变
+  PASS  C10c-a 恢复后返回 OK
+  PASS  C10c-b 恢复后 success = true
+  PASS  C10c-c 恢复后 failStreak 归零
+  PASS  C10c-d 恢复后待写分区清空
+  PASS  C10c-e 恢复后 failures 累计值不再增长（保留历史 3 次）
+  PASS  C10c-f 恢复后磁盘有数据
+  PASS  C10c-g 恢复后内存态仍未变（写盘不反向改内存）
+  PASS  L1-a markDirty(SETTINGS) 后 dirty 含 SETTINGS
+  PASS  L1-b saveNowSync 返回 OK
+  PASS  L1-c saveNowSync 后待写分区为空
+  PASS  L1-d saveNowSync 真的写到磁盘（SETTINGS 块头仍在）
+  PASS  L1-e saveNowSync 未改变已落盘的其他键数量
+  PASS  K-a 落盘含 KEY-01 标量键
+  PASS  K-b 落盘含 KEY-11 标量键
+  PASS  K-c KEY-01 的值是版本号 "1"
+  PASS  K-d META 不产生块键（无 *.meta.*.hdr / *.meta.*.cNNNN）
+  PASS  K-e 9 个分块基键各有且仅有一个 .hdr
+  PASS  K-f 每个 .hdr 的 n 与真实块数一致
+  PASS  K-g 块的 JSON 含 p / i / t / d 四字段，t 为数字，且块数与 .hdr.n 一致
+  PASS  K-h 块头 JSON 含 p / n / t / v 四字段且 v = CHUNK_FORMAT_VERSION(1)
+  PASS  K-i 键名长度均 ≤ MAX_KEY_LENGTH(80)
+  PASS  K-j 每个 value 的字符数 ≤ MAX_VALUE_LENGTH(8192)（A6 的 L2 侧前置校验）
+  PASS  R-a 设备 id 出现在磁盘 devices 块原文里（不是只在内存）
+  PASS  R-b 创建时间戳出现在磁盘 devices 块原文里
+  PASS  R-c 落盘的 bootCount 与内存一致
+  PASS  R-d 落盘的 firstLaunchAt 与内存一致
+[t403_repository] 55 passed, 0 failed
+  PASS  TC-B-01-a matchConditions(28℃, >28) 返回 false
+  PASS  TC-B-01-b matchedConditions(28℃) 长度为 0
+  PASS  TC-B-02-a matchConditions(28.1℃, >28) 返回 true
+  PASS  TC-B-02-b matchedConditions(28.1℃) 长度为 1
+  PASS  TC-B-03 brightness=0 → ResultCode.OK
+  PASS  TC-B-03 brightness=100 → ResultCode.OK
+  PASS  TC-B-03 temperature=16 → ResultCode.OK
+  PASS  TC-B-03 temperature=30 → ResultCode.OK
+  PASS  TC-B-03 openPercent=0 → ResultCode.OK
+  PASS  TC-B-03 openPercent=100 → ResultCode.OK
+  PASS  TC-B-03 fanSpeed=1 → ResultCode.OK
+  PASS  TC-B-03 fanSpeed=3 → ResultCode.OK
+  PASS  TC-B-06-a 第 1 轮（false→true）边沿触发为 true
+  PASS  TC-B-06-b 第 2~5 轮（true→true）均不再触发
+  PASS  TC-B-06-c 5 轮后 nextDedupFlag 仍为 true（lastSatisfied 持续成立）
+  PASS  TC-E-03 brightness=150 → ResultCode.INVALID_PARAM
+  PASS  TC-E-03 temperature=99 → ResultCode.INVALID_PARAM
+  PASS  TC-E-03 fanSpeed=9 → ResultCode.INVALID_PARAM
+  PASS  TC-E-06-a 首个 (device,paramKey) 申请写入权返回 true
+  PASS  TC-E-06-b 同 (device,paramKey) 被本轮其他规则占用返回 false
+  PASS  TC-E-06-c 本轮登记明细仅 1 条
+  PASS  TC-E-06-d 不同 (device,paramKey) 仍可申请（不受同设备其它键影响）
+  PASS  TC-E-06-e sortRules 按 createdAt 升序（priority 相同）
+  PASS  TC-E-06-f sortRules 按 id 字典序（priority/createdAt 相同）
+  PASS  TC-E-06-g sortRules 按 priority 升序（小者优先）
+[t405_business] 25 passed, 0 failed
+== L2 结果：全部断言通过 ==
+=== 完整输出原文结束 ===
+进程退出码: 0

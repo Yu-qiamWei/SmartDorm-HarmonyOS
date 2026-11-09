@@ -21,6 +21,12 @@ import { SectionCard } from '../components/common/SectionCard';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { ToastHost } from '../components/common/ToastHost';
 
+/** 诊断行数据（按引用传参，规避 D-6：@Builder 按值传参在父组件重渲染时不刷新）。 */
+interface InfoRowData {
+  label: string;
+  value: string;
+}
+
 @Entry
 @Component
 struct Settings {
@@ -42,8 +48,29 @@ struct Settings {
     this.refresh();
   };
 
+  /**
+   * 统一订阅入口：`undefined` 才注册，绝不产生重复订阅或定时器泄漏（防 D-5 僵尸订阅）。
+   * `router.back()` 复用页面栈中的缓存实例、不重走 `aboutToAppear()`；而 `aboutToDisappear()`
+   * 在本工程实测会在页面被覆盖时退订。二者叠加会让设置页成为「无订阅者僵尸实例」，
+   * 内存态变了、@State 没变。本方法在 `aboutToAppear` 与 `onPageShow` 都调用。
+   */
+  private ensureSubscriptions(): void {
+    if (this.unsubscribe === undefined) {
+      this.unsubscribe = AppDataRepository.getInstance().subscribe(this.onStateChange);
+    }
+  }
+
   aboutToAppear(): void {
-    this.unsubscribe = AppDataRepository.getInstance().subscribe(this.onStateChange);
+    this.ensureSubscriptions();
+    this.refresh();
+  }
+
+  /**
+   * 缓存实例被重新显示（router.back 返回设置页）时重订阅并按权威内存态刷新，
+   * 防止成为「无订阅者僵尸实例」（D-5）。
+   */
+  onPageShow(): void {
+    this.ensureSubscriptions();
     this.refresh();
   }
 
@@ -57,6 +84,9 @@ struct Settings {
   private refresh(): void {
     const repo = AppDataRepository.getInstance();
     const settings: AppSettings = repo.getState().settings;
+    // ★ P1 修复：开关的权威态必须回填，否则 @State 恒为字面量 true → commitSettings 串改另一开关。
+    this.automationOn = settings.automationEnabled;
+    this.simulationOn = settings.simulationEnabled;
     this.sampleInterval = settings.sampleIntervalMs;
     this.logLimit = settings.logLimit;
     this.subscriberCount = repo.subscriberCount();
@@ -150,8 +180,10 @@ struct Settings {
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
               .layoutWeight(1)
               .onClick(() => {
+                // ★ P1 双保险：未被点击修改的开关直接读权威内存态，不信任局部 @State。
+                const current: AppSettings = AppDataRepository.getInstance().getState().settings;
                 this.commitSettings(
-                  !this.automationOn, this.simulationOn, this.sampleInterval, this.logLimit
+                  !current.automationEnabled, current.simulationEnabled, this.sampleInterval, this.logLimit
                 );
               })
             Button(this.simulationOn ? '环境模拟：开' : '环境模拟：关')
@@ -163,8 +195,10 @@ struct Settings {
               .layoutWeight(1)
               .margin({ left: ThemeTokens.SPACE_ITEM_GAP })
               .onClick(() => {
+                // ★ P1 双保险：未被点击修改的开关直接读权威内存态，不信任局部 @State。
+                const current: AppSettings = AppDataRepository.getInstance().getState().settings;
                 this.commitSettings(
-                  this.automationOn, !this.simulationOn, this.sampleInterval, this.logLimit
+                  current.automationEnabled, !current.simulationEnabled, this.sampleInterval, this.logLimit
                 );
               })
           }
@@ -181,8 +215,9 @@ struct Settings {
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
               .layoutWeight(1)
               .onClick(() => {
+                const current: AppSettings = AppDataRepository.getInstance().getState().settings;
                 this.commitSettings(
-                  this.automationOn, this.simulationOn,
+                  current.automationEnabled, current.simulationEnabled,
                   Math.max(1000, this.sampleInterval - 500), this.logLimit
                 );
               })
@@ -199,8 +234,9 @@ struct Settings {
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
               .layoutWeight(1)
               .onClick(() => {
+                const current: AppSettings = AppDataRepository.getInstance().getState().settings;
                 this.commitSettings(
-                  this.automationOn, this.simulationOn,
+                  current.automationEnabled, current.simulationEnabled,
                   Math.min(10000, this.sampleInterval + 500), this.logLimit
                 );
               })
@@ -215,8 +251,9 @@ struct Settings {
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
               .layoutWeight(1)
               .onClick(() => {
+                const current: AppSettings = AppDataRepository.getInstance().getState().settings;
                 this.commitSettings(
-                  this.automationOn, this.simulationOn,
+                  current.automationEnabled, current.simulationEnabled,
                   this.sampleInterval, Math.max(100, this.logLimit - 100)
                 );
               })
@@ -233,8 +270,9 @@ struct Settings {
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
               .layoutWeight(1)
               .onClick(() => {
+                const current: AppSettings = AppDataRepository.getInstance().getState().settings;
                 this.commitSettings(
-                  this.automationOn, this.simulationOn,
+                  current.automationEnabled, current.simulationEnabled,
                   this.sampleInterval, this.logLimit + 100
                 );
               })
@@ -244,13 +282,13 @@ struct Settings {
         }
 
         SectionCard({ title: '应用信息', caption: '版本与平台信息按实测填写，不虚构' }) {
-          this.infoRow('应用名称', '智寓 · HarmonyOS 智能宿舍管家')
-          this.infoRow('版本', APP_VERSION)
-          this.infoRow('目标 SDK', 'HarmonyOS 5.0.5 / API 17')
-          this.infoRow('工程模型', 'Stage / ArkTS / ArkUI')
-          this.infoRow('bundleName', 'com.smartdorm.harmony')
-          this.infoRow('schemaVersion', String(SCHEMA_VERSION))
-          this.infoRow('运行时第三方依赖', '零')
+          this.infoRow({ label: '应用名称', value: '智寓 · HarmonyOS 智能宿舍管家' })
+          this.infoRow({ label: '版本', value: APP_VERSION })
+          this.infoRow({ label: '目标 SDK', value: 'HarmonyOS 5.0.5 / API 17' })
+          this.infoRow({ label: '工程模型', value: 'Stage / ArkTS / ArkUI' })
+          this.infoRow({ label: 'bundleName', value: 'com.smartdorm.harmony' })
+          this.infoRow({ label: 'schemaVersion', value: String(SCHEMA_VERSION) })
+          this.infoRow({ label: '运行时第三方依赖', value: '零' })
         }
 
         SectionCard({
@@ -272,9 +310,15 @@ struct Settings {
             .fontColor(ThemeTokens.TEXT_SECONDARY)
             .width('100%')
             .margin({ top: ThemeTokens.SPACE_ITEM_GAP })
-          this.infoRow('待落盘分区', String(this.dirtyCount))
-          this.infoRow('累计启动次数', String(this.bootCount))
-          this.infoRow('上次启动', this.formatLaunchTime(this.lastLaunchAt))
+          this.infoRow({ label: '待落盘分区', value: String(this.dirtyCount) })
+          // D-6 验证对照：直接文本控件，确认修复后 infoRow 与直接 @State 文本一致刷新。
+          Text('待落盘分区（直接文本对照）：' + String(this.dirtyCount))
+            .fontSize(ThemeTokens.FONT_CAPTION)
+            .fontColor(ThemeTokens.TEXT_HINT)
+            .width('100%')
+            .margin({ top: 2 })
+          this.infoRow({ label: '累计启动次数', value: String(this.bootCount) })
+          this.infoRow({ label: '上次启动', value: this.formatLaunchTime(this.lastLaunchAt) })
           Text('持久化诊断（最新 ' + this.diagnostics.length + ' 条）')
             .fontSize(ThemeTokens.FONT_CAPTION)
             .fontColor(ThemeTokens.TEXT_SECONDARY)
@@ -358,13 +402,13 @@ struct Settings {
   }
 
   @Builder
-  infoRow(label: string, value: string) {
+  infoRow(data: InfoRowData) {
     Row() {
-      Text(label)
+      Text(data.label)
         .fontSize(ThemeTokens.FONT_BODY)
         .fontColor(ThemeTokens.TEXT_SECONDARY)
         .width('35%')
-      Text(value)
+      Text(data.value)
         .fontSize(ThemeTokens.FONT_BODY)
         .fontColor(ThemeTokens.TEXT_PRIMARY)
         .layoutWeight(1)
