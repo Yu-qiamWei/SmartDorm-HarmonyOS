@@ -1,6 +1,7 @@
-# tests/l2 · 阶段四 T4-01 L2 断言
+# tests/l2 · 阶段四 T4-01 / T4-02 L2 断言
 
-> 本目录只做**纯逻辑层（L2）**断言：`StorageKeys` 的键拼接/解析、`WriteQueue` 的合并/串行/失败保 dirty/写入顺序/块收缩。
+> 本目录只做**纯逻辑层（L2）**断言：`StorageKeys` 的键拼接/解析、`WriteQueue` 的合并/串行/失败保 dirty/写入顺序/块收缩、
+> `Serializer` 的分块编解码与三级一致性校验、`SchemaMigration` 的版本链、`StorageDiagnostics` 的环形缓冲。
 > 它**不证明**应用在设备上落盘成功，也不代替 L4（模拟器/真机）验证。结论以命令原文为准。
 
 ## 为什么不能直接跑 `.ets`
@@ -34,6 +35,11 @@ node tests/l2/run.js
 | `assert.js` | 极简断言器（PASS/FAIL 原文输出，便于贴证据） |
 | `t401_keys.js` | 判据 **A2**：`chunkKey` / `chunkIndexOf` / `baseOfPartition` / `isChunked` / 键长预算 |
 | `t401_queue.js` | 判据 **A3 / A4 / A7 / A8**：合并、重入去重、失败保 dirty、写入顺序、块收缩 |
+| `t402_serializer.js` | 判据 **B2 / B3 / B4 / B5 / B6 / B9 / B10 / B11 / B12 / B13 + E1 / E2**：块长上限、逐条往返、单条守卫边界、块数一致性①②③、坏数据逐分区独立、版本号解析、加载期守卫 |
+| `t402_migration.js` | 判据 **B7**：同版本直通、v0→v1 链式、版本倒退保留数据不降级、字段兜底、不删合法数据 |
+| `t402_diagnostics.js` | 判据 **B8**：60 条写入后容量 50、`seq` 升序、首条 `seq = 11`、副本语义、`clear()` 后 `seq` 不回零 |
+
+当前合计 **227 条断言**（A2 40 / A3-A8 35 / B 系 152）。
 
 ## 两个刻意的取舍
 
@@ -41,11 +47,13 @@ node tests/l2/run.js
    用它取独立实例，避免单例状态在用例间串味。生产路径 `getInstance()` 返回的也是同一个类。
 2. **fake `PartitionWriter` 自己实现 `trimChunks` 语义**（删索引 ≥ `keepCount` 的残块、幂等）：
    这是 §4.2 契约里**写面实现方**的责任，A8 断言的是「队列把正确的 `keepCount` 传下去 + 写面照约收缩」这一对行为。
+3. **T4-02 的块字符串一律由被测的 `encodePartition` / `encodeHeader` 生成**（B12 除外——那条必须手工造
+   「块内混入超长条目」的旧格式块），避免测试自己造一套格式而与实现漂移。
 
 ## 未覆盖（如实标注）
 
 | 项 | 原因 |
 | --- | --- |
-| `PreferencesStore` 全部行为（判据 A5 / A6） | 依赖 `@kit.ArkData`，Node 侧无法解析；只能 L4（模拟器/真机）验证 |
-| 真实 `preferences` 的分块键落盘与 `flush()` 批次效果 | 同上，L4 |
-| 重启恢复、`bootCount`、`lastSatisfied` 跨重启 | L4，且需 T4-02 / T4-03 落地后才具备条件 |
+| `PreferencesStore` 全部行为（判据 A5 / A6） | 依赖系统偏好能力，Node 侧无法解析；只能 L4（模拟器/真机）验证 |
+| 真实分块落盘、`flush()` 批次效果、重启恢复 | 同上，L4，且需 T4-03 接线后才具备条件 |
+| A5 的「非法 context」分支 | 无法合法构造非法 `Context`；T4-03 按「`init` 前 `isReady() === false`」+ 代码走查处理，并在报告标注「非法 context 分支未在设备上构造」 |

@@ -18,7 +18,13 @@ const { spawnSync } = require('child_process');
 const HERE = __dirname;
 const TSC_JS = 'D:/DevEco Studio/tools/hvigor/hvigor/node_modules/typescript/lib/tsc.js';
 
-const TESTS = ['t401_keys.js', 't401_queue.js'];
+const TESTS = [
+  't401_keys.js',
+  't401_queue.js',
+  't402_serializer.js',
+  't402_migration.js',
+  't402_diagnostics.js'
+];
 
 function runNode(args, cwd) {
   const result = spawnSync(process.execPath, args, { cwd: cwd, stdio: 'inherit' });

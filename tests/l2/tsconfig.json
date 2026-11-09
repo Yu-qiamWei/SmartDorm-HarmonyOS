@@ -16,6 +16,9 @@
   },
   "files": [
     ".gen/src/store/StorageKeys.ts",
-    ".gen/src/store/WriteQueue.ts"
+    ".gen/src/store/WriteQueue.ts",
+    ".gen/src/store/Serializer.ts",
+    ".gen/src/store/SchemaMigration.ts",
+    ".gen/src/store/StorageDiagnostics.ts"
   ]
 }
