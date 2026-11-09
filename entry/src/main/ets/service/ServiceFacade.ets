@@ -287,7 +287,7 @@ export class ServiceFacade {
   }
 
   /** FR-07-04 导出到沙箱 `filesDir/exports/`（未注入上下文时返回 STORAGE_ERROR，不崩溃）。 */
-  exportState(state: AppState, format: string): CommandResult<string> {
+  async exportState(state: AppState, format: string): Promise<CommandResult<string>> {
     return ExportService.getInstance().exportToFilesDir(state, format);
   }
 

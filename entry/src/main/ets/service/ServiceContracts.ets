@@ -95,7 +95,7 @@ export interface ILogService {
 
 /** FR-07-04：沙箱内导出（跨应用分享列 P2，不纳入本阶段）。实现：`ExportService`。 */
 export interface IExportService {
-  exportToFilesDir(state: AppState, format: string): CommandResult<string>;
+  exportToFilesDir(state: AppState, format: string): Promise<CommandResult<string>>;
 }
 
 // ——————————————————————————————————————————————————————————————

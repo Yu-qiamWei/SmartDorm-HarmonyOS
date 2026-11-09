@@ -8,8 +8,10 @@ import { AppState } from '../model/AppState';
 import { CommandResult } from '../model/CommandResult';
 import { ResetScope } from '../model/Enums';
 import { AppDataRepository } from '../store/AppDataRepository';
+import { DiagnosticEntry, DiagnosticLevel } from '../store/StorageDiagnostics';
 import { ThemeTokens } from '../common/ThemeTokens';
 import { APP_VERSION, DEFAULT_LOG_LIMIT, DEFAULT_SAMPLE_INTERVAL_MS, SCHEMA_VERSION } from '../common/Constants';
+import { TimeUtil } from '../common/TimeUtil';
 import {
   StateChangeHandler, Unsubscribe, ChangeSet
 } from '../common/StateChangeTypes';
@@ -29,7 +31,11 @@ struct Settings {
   @State logLimit: number = DEFAULT_LOG_LIMIT;
   @State subscriberCount: number = 0;
   @State exportNote: string = '尚未导出';
-  @State flushNote: string = '尚未手动保存';
+  @State flushNote: string = '数据随生命周期自动落盘；可点「立即保存」强制写入';
+  @State dirtyCount: number = 0;
+  @State bootCount: number = 0;
+  @State lastLaunchAt: number = 0;
+  @State diagnostics: DiagnosticEntry[] = [];
 
   private unsubscribe: Unsubscribe | undefined = undefined;
   private onStateChange: StateChangeHandler = (change: ChangeSet): void => {
@@ -49,10 +55,24 @@ struct Settings {
   }
 
   private refresh(): void {
-    const settings: AppSettings = AppDataRepository.getInstance().getState().settings;
+    const repo = AppDataRepository.getInstance();
+    const settings: AppSettings = repo.getState().settings;
     this.sampleInterval = settings.sampleIntervalMs;
     this.logLimit = settings.logLimit;
-    this.subscriberCount = AppDataRepository.getInstance().subscriberCount();
+    this.subscriberCount = repo.subscriberCount();
+    this.dirtyCount = repo.dirtyPartitions().length;
+    const meta = repo.getRuntimeMeta();
+    this.bootCount = meta.bootCount;
+    this.lastLaunchAt = meta.lastLaunchAt;
+    this.diagnostics = repo.getDiagnostics();
+  }
+
+  /** 把 epoch ms 格式化为 ISO UTC；未记录时返回占位符（首启前 lastLaunchAt 为 0）。 */
+  private formatLaunchTime(ts: number): string {
+    if (ts <= 0) {
+      return '—';
+    }
+    return TimeUtil.toIsoUtc(ts);
   }
 
   /** 所有设置项统一走 Service 契约占位 + Toast 反馈（FR-08-01）。 */
@@ -83,7 +103,7 @@ struct Settings {
   private resetAll(): void {
     ConfirmDialog.show(
       '重置全部数据',
-      '将恢复默认设备 / 规则 / 场景 / 设置 / 日志。阶段二为接口占位，不会真实写入。',
+      '将恢复默认设备 / 规则 / 场景 / 设置 / 日志，并立即持久化（真实写入，不可撤销）。',
       (): void => {
         ServiceFacade.getInstance().resetData(ResetScope.ALL)
           .then((result: CommandResult<AppState>): void => {
@@ -96,17 +116,18 @@ struct Settings {
   private manualFlush(): void {
     ServiceFacade.getInstance().flush()
       .then((result: CommandResult<void>): void => {
-        this.flushNote = '手动保存请求结果：' + result.code;
+        this.flushNote = '保存结果：' + result.message;
         ToastHost.showResult(result);
       });
   }
 
   private exportState(): void {
     const state: AppState = AppDataRepository.getInstance().getState();
-    const result: CommandResult<string> =
-      ServiceFacade.getInstance().exportState(state, 'json');
-    this.exportNote = '导出请求结果：' + result.code + ' · ' + result.message;
-    ToastHost.showResult<string>(result);
+    ServiceFacade.getInstance().exportState(state, 'json')
+      .then((result: CommandResult<string>): void => {
+        this.exportNote = '导出结果：' + result.message;
+        ToastHost.showResult<string>(result);
+      });
   }
 
   build() {
@@ -251,6 +272,29 @@ struct Settings {
             .fontColor(ThemeTokens.TEXT_SECONDARY)
             .width('100%')
             .margin({ top: ThemeTokens.SPACE_ITEM_GAP })
+          this.infoRow('待落盘分区', String(this.dirtyCount))
+          this.infoRow('累计启动次数', String(this.bootCount))
+          this.infoRow('上次启动', this.formatLaunchTime(this.lastLaunchAt))
+          Text('持久化诊断（最新 ' + this.diagnostics.length + ' 条）')
+            .fontSize(ThemeTokens.FONT_CAPTION)
+            .fontColor(ThemeTokens.TEXT_SECONDARY)
+            .width('100%')
+            .margin({ top: ThemeTokens.SPACE_ITEM_GAP })
+          ForEach(this.diagnostics, (entry: DiagnosticEntry): void => {
+            Row() {
+              Text('[' + entry.level + '] ' + entry.code)
+                .fontSize(ThemeTokens.FONT_CAPTION)
+                .fontColor(entry.level === DiagnosticLevel.ERROR ? ThemeTokens.STATUS_FAULT : ThemeTokens.TEXT_SECONDARY)
+              Text(entry.detail)
+                .fontSize(ThemeTokens.FONT_CAPTION)
+                .fontColor(ThemeTokens.TEXT_SECONDARY)
+                .layoutWeight(1)
+                .margin({ left: 6 })
+                .maxLines(3)
+            }
+            .width('100%')
+            .margin({ top: 4 })
+          }, (entry: DiagnosticEntry): string => entry.seq.toString())
         }
 
         SectionCard({ title: '数据导出', caption: 'FR-07-04 收窄为沙箱 filesDir 导出' }) {
@@ -285,16 +329,16 @@ struct Settings {
         }
 
         SectionCard({ title: '降级与局限说明', caption: 'FR-07-08 / 运行载体风险 10.1' }) {
-          Text('· 阶段二：PreferencesStore 实际读写、序列化、schemaVersion 迁移与串行写队列留 ST-04。')
+          Text('· 持久化（PreferencesStore 实际读写、分块序列化、schemaVersion 迁移、串行写队列、生命周期落盘）已在 ST-04 实现；逻辑经 DevEco tsc(strict) 全量类型校验与 282 条 L2 断言验证。')
             .fontSize(ThemeTokens.FONT_BODY)
             .fontColor(ThemeTokens.TEXT_SECONDARY)
             .width('100%')
-          Text('· 当前 hdc list targets = [Empty]，已部署模拟器镜像最高 API 12 与 SDK API 17 不匹配；未进行真机运行验证。')
+          Text('· 设备级运行验证（安装 → 强制停止 → 重启 → 字段级恢复 + 异常降级）需在 DevEco 主机对 API 17 模拟器执行；当前沙箱环境未运行模拟器，尚未进行模拟器运行验证。')
             .fontSize(ThemeTokens.FONT_BODY)
             .fontColor(ThemeTokens.TEXT_SECONDARY)
             .width('100%')
             .margin({ top: 6 })
-          Text('· 所有 Service 调用当前为阶段二接口占位，返回带明确 ResultCode 的安全默认值。')
+          Text('· Service 调用（更新设置 / 重置 / 串行落盘 / 沙箱导出）均为真实实现，返回带明确 ResultCode 的结果；导出前会先 await 持久化完成。')
             .fontSize(ThemeTokens.FONT_BODY)
             .fontColor(ThemeTokens.TEXT_SECONDARY)
             .width('100%')

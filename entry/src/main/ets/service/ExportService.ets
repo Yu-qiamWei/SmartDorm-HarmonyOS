@@ -32,6 +32,7 @@ import { DeviceParamsFactory } from '../model/DeviceParams';
 import { EXPORT_DIR_NAME } from '../common/Constants';
 import { TimeUtil } from '../common/TimeUtil';
 import { IExportService } from './ServiceContracts';
+import { AppDataRepository } from '../store/AppDataRepository';
 
 /** 导出日志条数汇总（不含日志正文，正文规模由阶段四决定是否分文件）。 */
 export interface ExportLogCounts {
@@ -87,11 +88,19 @@ export class ExportService implements IExportService {
    * 导出当前内存态到 `filesDir/exports/export_<epochMs>.json|csv`。
    * 返回值为**真实写入的文件绝对路径**；写入 0 字节视为失败（不谎报成功）。
    */
-  exportToFilesDir(state: AppState, format: string): CommandResult<string> {
+  async exportToFilesDir(state: AppState, format: string): Promise<CommandResult<string>> {
     const context: common.Context | undefined = this.context;
     if (context === undefined) {
       return failResult<string>(
         ResultCode.STORAGE_ERROR, '导出未初始化：缺少应用上下文（应在 EntryAbility.onCreate 注入）'
+      );
+    }
+    // 需求4：导出前先等待持久化完成，避免「导出成功但数据仍未落盘」。
+    // 若落盘失败（存储不可用），中止导出并返回 STORAGE_ERROR，绝不谎报导出成功。
+    const persisted: CommandResult<void> = await AppDataRepository.getInstance().flush();
+    if (persisted.code !== ResultCode.OK && persisted.code !== ResultCode.NO_CHANGE) {
+      return failResult<string>(
+        ResultCode.STORAGE_ERROR, '导出前持久化失败，已中止导出：' + persisted.message
       );
     }
     const isCsv: boolean = format.toLowerCase() === 'csv';

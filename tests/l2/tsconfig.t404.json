@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2021",
+    "moduleResolution": "node",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": false,
+    "forceConsistentCasingInFileNames": true,
+    "rootDir": ".gen/src",
+    "outDir": ".gen/out404",
+    "sourceMap": false,
+    "declaration": false,
+    "noEmitOnError": false,
+    "removeComments": false,
+    "baseUrl": ".gen/src",
+    "paths": {
+      "@kit.ArkData": ["__stub/kit_arkdata"],
+      "@kit.AbilityKit": ["__stub/kit_abilitykit"],
+      "@kit.BasicServicesKit": ["__stub/kit_basicservices"],
+      "@kit.ArkTS": ["__stub/kit_arkts"],
+      "@kit.CoreFileKit": ["__stub/kit_corefile"]
+    }
+  },
+  "files": [
+    ".gen/src/service/ExportService.ts"
+  ]
+}
