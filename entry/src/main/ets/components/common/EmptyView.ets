@@ -27,6 +27,7 @@ export struct EmptyView {
         .margin({ top: 8, bottom: ThemeTokens.SPACE_ITEM_GAP })
       Button(this.actionLabel)
         .fontSize(ThemeTokens.FONT_BODY)
+        .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
         .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
         .backgroundColor(ThemeTokens.PRIMARY)
         .borderRadius(ThemeTokens.RADIUS_CONTROL)

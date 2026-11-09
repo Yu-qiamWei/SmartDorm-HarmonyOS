@@ -67,6 +67,7 @@ export struct SensorCard {
       Row() {
         Button('−' + this.step)
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.PRIMARY)
           .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -78,6 +79,7 @@ export struct SensorCard {
           })
         Button('+' + this.step)
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.PRIMARY)
           .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -90,6 +92,7 @@ export struct SensorCard {
           })
         Button('应用')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
           .backgroundColor(ThemeTokens.PRIMARY)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)

@@ -26,6 +26,7 @@ export struct PageHeader {
       if (this.showBack) {
         Button('返回')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.PRIMARY)
           .backgroundColor(ThemeTokens.CARD_BACKGROUND)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -39,11 +40,20 @@ export struct PageHeader {
           .fontSize(ThemeTokens.FONT_TITLE_LARGE)
           .fontWeight(FontWeight.Bold)
           .fontColor(ThemeTokens.TEXT_PRIMARY)
+          // 手机 387.7vp 下 26fp 的 9 字标题会折成两行并留下单字孤行（真机 DEV-04）。
+          // 改为单行 + 字号自适应收缩：宽屏仍用 26fp，窄屏自动缩到 18fp 不换行。
+          .maxLines(1)
+          .minFontSize(18)
+          .maxFontSize(26)
+          .heightAdaptivePolicy(TextHeightAdaptivePolicy.MIN_FONT_SIZE_FIRST)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
         if (this.subtitle.length > 0) {
           Text(this.subtitle)
             .fontSize(ThemeTokens.FONT_CAPTION)
             .fontColor(ThemeTokens.TEXT_SECONDARY)
             .margin({ top: 4 })
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
       }
       .alignItems(HorizontalAlign.Start)
@@ -53,6 +63,7 @@ export struct PageHeader {
       if (this.actionLabel.length > 0) {
         Button(this.actionLabel)
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
           .backgroundColor(ThemeTokens.PRIMARY)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -62,6 +73,7 @@ export struct PageHeader {
       } else {
         Button('设置')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.PRIMARY)
           .backgroundColor(ThemeTokens.CARD_BACKGROUND)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)

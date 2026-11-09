@@ -64,6 +64,7 @@ struct SceneList {
           Row() {
             Button('新建自定义场景')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
               .backgroundColor(ThemeTokens.PRIMARY)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -73,6 +74,7 @@ struct SceneList {
               })
             Button('查看切换日志')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -85,6 +87,7 @@ struct SceneList {
           .width('100%')
           Button('回寝状态恢复说明')
             .fontSize(ThemeTokens.FONT_CAPTION)
+            .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
             .fontColor(ThemeTokens.TEXT_SECONDARY)
             .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
             .borderRadius(ThemeTokens.RADIUS_CONTROL)

@@ -123,6 +123,7 @@ struct Settings {
           Row() {
             Button(this.automationOn ? '自动化：开' : '自动化：关')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
               .backgroundColor(this.automationOn ? ThemeTokens.STATUS_RUNNING : ThemeTokens.STATUS_IDLE)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -134,6 +135,7 @@ struct Settings {
               })
             Button(this.simulationOn ? '环境模拟：开' : '环境模拟：关')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
               .backgroundColor(this.simulationOn ? ThemeTokens.ACCENT : ThemeTokens.STATUS_IDLE)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -152,6 +154,7 @@ struct Settings {
           Row() {
             Button('间隔 −500')
               .fontSize(ThemeTokens.FONT_CAPTION)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -169,6 +172,7 @@ struct Settings {
               .textAlign(TextAlign.Center)
             Button('间隔 +500')
               .fontSize(ThemeTokens.FONT_CAPTION)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -184,6 +188,7 @@ struct Settings {
           Row() {
             Button('上限 −100')
               .fontSize(ThemeTokens.FONT_CAPTION)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -201,6 +206,7 @@ struct Settings {
               .textAlign(TextAlign.Center)
             Button('上限 +100')
               .fontSize(ThemeTokens.FONT_CAPTION)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -232,6 +238,7 @@ struct Settings {
         }) {
           Button('手动触发保存')
             .fontSize(ThemeTokens.FONT_BODY)
+            .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
             .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
             .backgroundColor(ThemeTokens.PRIMARY)
             .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -249,6 +256,7 @@ struct Settings {
         SectionCard({ title: '数据导出', caption: 'FR-07-04 收窄为沙箱 filesDir 导出' }) {
           Button('导出当前状态（JSON）')
             .fontSize(ThemeTokens.FONT_BODY)
+            .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
             .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
             .backgroundColor(ThemeTokens.ACCENT)
             .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -266,6 +274,7 @@ struct Settings {
         SectionCard({ title: '数据重置', caption: 'FR-07-03：重置前必须二次确认' }) {
           Button('重置全部数据')
             .fontSize(ThemeTokens.FONT_BODY)
+            .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
             .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
             .backgroundColor(ThemeTokens.STATUS_FAULT)
             .borderRadius(ThemeTokens.RADIUS_CONTROL)

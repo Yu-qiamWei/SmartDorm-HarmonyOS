@@ -79,6 +79,7 @@ export struct SceneCard {
       Row() {
         Button('切换场景')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
           .backgroundColor(this.active ? ThemeTokens.ACCENT : ThemeTokens.PRIMARY)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -88,6 +89,7 @@ export struct SceneCard {
           })
         Button('编辑')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.PRIMARY)
           .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -98,6 +100,7 @@ export struct SceneCard {
           })
         Button('删除')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.STATUS_FAULT)
           .backgroundColor(ThemeTokens.WARNING_BACKGROUND)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)

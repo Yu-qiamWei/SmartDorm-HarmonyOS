@@ -198,9 +198,14 @@ struct DeviceDetail {
                 .fontSize(ThemeTokens.FONT_TITLE_LARGE)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(ThemeTokens.TEXT_PRIMARY)
+                .width('100%')
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
               Text('类型 ' + this.deviceType + '　·　' + this.paramSummary)
                 .fontSize(ThemeTokens.FONT_BODY)
                 .fontColor(ThemeTokens.TEXT_SECONDARY)
+                .maxLines(2)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .margin({ top: 6 })
             }
             .alignItems(HorizontalAlign.Start)
@@ -217,6 +222,7 @@ struct DeviceDetail {
             .margin({ top: ThemeTokens.SPACE_ITEM_GAP })
           Button(this.powerOn ? '关闭电源' : '开启电源')
             .fontSize(ThemeTokens.FONT_BODY)
+            .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
             .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
             .backgroundColor(ThemeTokens.PRIMARY)
             .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -232,6 +238,7 @@ struct DeviceDetail {
             Row() {
               Button('上锁')
                 .fontSize(ThemeTokens.FONT_BODY)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
                 .backgroundColor(ThemeTokens.PRIMARY)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -241,6 +248,7 @@ struct DeviceDetail {
                 })
               Button('解锁')
                 .fontSize(ThemeTokens.FONT_BODY)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.PRIMARY)
                 .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -255,6 +263,7 @@ struct DeviceDetail {
             Row() {
               Button('−' + this.stepOf())
                 .fontSize(ThemeTokens.FONT_BODY)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.PRIMARY)
                 .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -267,8 +276,11 @@ struct DeviceDetail {
                 .fontColor(ThemeTokens.TEXT_PRIMARY)
                 .layoutWeight(1)
                 .textAlign(TextAlign.Center)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
               Button('+' + this.stepOf())
                 .fontSize(ThemeTokens.FONT_BODY)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
                 .backgroundColor(ThemeTokens.PRIMARY)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -291,10 +303,12 @@ struct DeviceDetail {
           title: '模拟/调试区（非真实硬件故障）',
           caption: this.diagnosticNote
         }) {
-          GridRow({ columns: 2, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
+          // 6 个短按钮：sm（约 347vp 内容宽）下双列每格约 167vp，文字与 44vp 热区均充足
+          GridRow({ columns: ThemeTokens.GRID_TILES_PHONE, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
             GridCol({ span: 1 }) {
               Button('置 RUNNING')
                 .fontSize(ThemeTokens.FONT_CAPTION)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
                 .backgroundColor(ThemeTokens.STATUS_RUNNING)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -306,6 +320,7 @@ struct DeviceDetail {
             GridCol({ span: 1 }) {
               Button('置 IDLE')
                 .fontSize(ThemeTokens.FONT_CAPTION)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
                 .backgroundColor(ThemeTokens.STATUS_IDLE)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -317,6 +332,7 @@ struct DeviceDetail {
             GridCol({ span: 1 }) {
               Button('置 FAULT')
                 .fontSize(ThemeTokens.FONT_CAPTION)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
                 .backgroundColor(ThemeTokens.STATUS_FAULT)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -328,6 +344,7 @@ struct DeviceDetail {
             GridCol({ span: 1 }) {
               Button('置 OFFLINE')
                 .fontSize(ThemeTokens.FONT_CAPTION)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
                 .backgroundColor(ThemeTokens.STATUS_OFFLINE)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -339,6 +356,7 @@ struct DeviceDetail {
             GridCol({ span: 1 }) {
               Button('置在线')
                 .fontSize(ThemeTokens.FONT_CAPTION)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.PRIMARY)
                 .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -350,6 +368,7 @@ struct DeviceDetail {
             GridCol({ span: 1 }) {
               Button('置离线')
                 .fontSize(ThemeTokens.FONT_CAPTION)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.STATUS_OFFLINE)
                 .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -364,12 +383,13 @@ struct DeviceDetail {
 
         SectionCard({ title: '历史操作记录', caption: '来自真实 OperationLog，按 deviceId 过滤' }) {
           if (this.operationLogs.length === 0) {
-            Text('该设备暂无操作记录（阶段二禁止预置演示日志）')
+            Text('该设备暂无操作记录（系统不预置演示日志，操作后产生）')
               .fontSize(ThemeTokens.FONT_BODY)
               .fontColor(ThemeTokens.TEXT_SECONDARY)
               .width('100%')
             Button('去设备列表')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
               .backgroundColor(ThemeTokens.PRIMARY)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)

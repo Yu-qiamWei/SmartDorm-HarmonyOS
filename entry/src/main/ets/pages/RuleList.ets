@@ -68,6 +68,7 @@ struct RuleList {
           Row() {
             Button('新建规则')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
               .backgroundColor(ThemeTokens.PRIMARY)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -77,6 +78,7 @@ struct RuleList {
               })
             Button('查看执行记录')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -89,6 +91,7 @@ struct RuleList {
           .width('100%')
           Button('查看规则求值报告说明')
             .fontSize(ThemeTokens.FONT_CAPTION)
+            .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
             .fontColor(ThemeTokens.TEXT_SECONDARY)
             .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
             .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -105,7 +108,7 @@ struct RuleList {
           if (this.rules.length === 0) {
             EmptyView({
               message: '暂无自动化规则',
-              hint: '规则必须由用户在界面上创建后生效，阶段二不预置演示规则',
+              hint: '规则必须由用户在界面上创建后生效，系统不预置演示规则',
               actionLabel: '新建规则',
               onAction: (): void => {
                 RouteMap.push(RouteMap.RULE_EDIT, { mode: 'create' });

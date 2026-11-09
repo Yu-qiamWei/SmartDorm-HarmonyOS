@@ -79,6 +79,7 @@ export struct RuleCard {
       Row() {
         Button(this.rule.enabled ? '停用' : '启用')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
           .backgroundColor(ThemeTokens.PRIMARY)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -88,6 +89,7 @@ export struct RuleCard {
           })
         Button('编辑')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.PRIMARY)
           .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -98,6 +100,7 @@ export struct RuleCard {
           })
         Button('删除')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.STATUS_FAULT)
           .backgroundColor(ThemeTokens.WARNING_BACKGROUND)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)

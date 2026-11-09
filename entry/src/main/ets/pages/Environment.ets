@@ -78,13 +78,24 @@ struct Environment {
     ToastHost.showResult<AppSettings>(result);
   }
 
+  /**
+   * 真实求值：调用 RuleEngine 求值当前快照，回填真实报告摘要（触发 / 去重跳过 / 冲突跳过 / 新增日志）。
+   * `skipReason` 仅在总开关关闭或日志提交失败时非空，其余情况给出真实计数，避免空 Toast。
+   */
   private requestEvaluation(): void {
     const snapshot: EnvironmentData = AppDataRepository.getInstance().getState().environment;
     ServiceFacade.getInstance().evaluateRules(snapshot)
       .then((report: RuleEvaluationReport): void => {
         this.lastReport = '报告时间 ' + TimeUtil.format(report.evaluatedAt) +
-          ' · 触发 ' + report.triggeredRules.length + ' 条 · 新增日志 ' + report.newLogs.length + ' 条';
-        ToastHost.showMessage(report.skipReason);
+          ' · 触发 ' + report.triggeredRules.length + ' 条' +
+          ' · 去重跳过 ' + report.skippedDedupRules.length + ' 条' +
+          ' · 冲突跳过 ' + report.skippedConflictRules.length + ' 条' +
+          ' · 新增日志 ' + report.newLogs.length + ' 条' +
+          ' · 耗时 ' + report.durationMs + ' ms';
+        ToastHost.showMessage(report.skipReason.length > 0
+          ? report.skipReason
+          : '求值完成：触发 ' + report.triggeredRules.length + ' 条规则，新增 ' +
+            report.newLogs.length + ' 条执行日志');
       });
   }
 
@@ -131,6 +142,7 @@ struct Environment {
           Row() {
             Button(this.simulationOn ? '关闭环境模拟' : '开启环境模拟')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
               .backgroundColor(this.simulationOn ? ThemeTokens.ACCENT : ThemeTokens.STATUS_IDLE)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -140,6 +152,7 @@ struct Environment {
               })
             Button('手动采样一次')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -150,8 +163,9 @@ struct Environment {
               })
           }
           .width('100%')
-          Button('查看规则求值报告（阶段二占位）')
+          Button('查看规则求值报告')
             .fontSize(ThemeTokens.FONT_BODY)
+            .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
             .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
             .backgroundColor(ThemeTokens.PRIMARY_DARK)
             .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -208,6 +222,7 @@ struct Environment {
               .layoutWeight(1)
             Button(this.humanPresence ? '置为无人' : '置为有人')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
               .backgroundColor(ThemeTokens.PRIMARY)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)

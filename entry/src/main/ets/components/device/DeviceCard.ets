@@ -49,7 +49,9 @@ export struct DeviceCard {
           .fontSize(ThemeTokens.FONT_TITLE_MEDIUM)
           .fontWeight(FontWeight.Bold)
           .fontColor(ThemeTokens.TEXT_PRIMARY)
-        Blank()
+          .layoutWeight(1)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
         StatusBadge({ status: this.device.status })
       }
       .width('100%')
@@ -68,6 +70,7 @@ export struct DeviceCard {
       Row() {
         Button('查看详情')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.PRIMARY)
           .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -77,6 +80,7 @@ export struct DeviceCard {
           })
         Button(this.device.powerOn ? '关闭' : '开启')
           .fontSize(ThemeTokens.FONT_BODY)
+          .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
           .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
           .backgroundColor(ThemeTokens.PRIMARY)
           .borderRadius(ThemeTokens.RADIUS_CONTROL)

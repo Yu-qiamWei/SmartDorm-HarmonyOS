@@ -49,6 +49,7 @@ export struct ConfirmDialogPreview {
         .fontColor(ThemeTokens.TEXT_SECONDARY)
         .margin({ bottom: ThemeTokens.SPACE_ITEM_GAP })
       Button('演示二次确认')
+        .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
         .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
         .backgroundColor(ThemeTokens.STATUS_FAULT)
         .borderRadius(ThemeTokens.RADIUS_CONTROL)

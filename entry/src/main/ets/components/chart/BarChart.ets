@@ -75,18 +75,27 @@ export struct BarChart {
     const slot: number = plotW / bars.length;
     const barWidth: number = slot * 0.55;
     const color: string = this.model.color.length > 0 ? this.model.color : ThemeTokens.PRIMARY;
+    // 标签以柱心居中绘制；窄屏（手机单列，且最多 6~7 根柱）时 slot 可能只有 30vp 左右，
+    // 按 12px 字号估算可容纳字数并截断，避免相邻标签互相压字或冲出画布右边界。
+    const maxLabelChars: number = Math.max(2, Math.floor(slot / 12));
+    ctx.textAlign = 'center';
 
     for (let i = 0; i < bars.length; i++) {
       const value: number = bars[i].value;
       const barHeight: number = (plotH * value) / maxValue;
       const x: number = padding + slot * i + (slot - barWidth) / 2;
+      const centerX: number = padding + slot * i + slot / 2;
       const y: number = h - padding - barHeight;
       ctx.fillStyle = color;
       ctx.fillRect(x, y, barWidth, barHeight);
       ctx.fillStyle = ThemeTokens.TEXT_SECONDARY;
       ctx.font = '12px sans-serif';
-      ctx.fillText(bars[i].label, x, h - padding + 18);
-      ctx.fillText(String(value), x, y - 6);
+      const rawLabel: string = bars[i].label;
+      const label: string = rawLabel.length > maxLabelChars
+        ? rawLabel.substring(0, maxLabelChars - 1) + '…'
+        : rawLabel;
+      ctx.fillText(label, centerX, h - padding + 18);
+      ctx.fillText(String(value), centerX, y - 6);
     }
   }
 

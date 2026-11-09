@@ -146,6 +146,7 @@ struct SceneEdit {
             })
           Button('全部开启 / 全部关闭')
             .fontSize(ThemeTokens.FONT_BODY)
+            .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
             .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
             .backgroundColor(ThemeTokens.PRIMARY)
             .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -190,6 +191,7 @@ struct SceneEdit {
                 .layoutWeight(1)
                 Button(this.targetPower[index] ? '目标：开' : '目标：关')
                   .fontSize(ThemeTokens.FONT_CAPTION)
+                  .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                   .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
                   .backgroundColor(this.targetPower[index]
                     ? ThemeTokens.STATUS_RUNNING : ThemeTokens.STATUS_IDLE)
@@ -208,6 +210,7 @@ struct SceneEdit {
           Row() {
             Button('保存场景')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
               .backgroundColor(ThemeTokens.ACCENT)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -217,6 +220,7 @@ struct SceneEdit {
               })
             Button('取消返回')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)

@@ -1,6 +1,7 @@
 /**
- * 智寓 · 设备管理列表（FR-02 / T-04 D4）
- * 增删入口、状态徽标、跳详情全部真实；平板断点用 GridRow/GridCol 自适应列数。
+ * 智寓 · 设备管理列表（FR-02 / T4-D4）
+ * 增删入口、状态徽标、跳详情全部真实；列数按断点分两档：
+ * 类型选择按钮（小格子）sm 2 列 / md+ 3 列；设备卡片（含两个并排按钮）sm **单列** / md+ 2 列。
  */
 import { mediaquery } from '@kit.ArkUI';
 import { Device } from '../model/Device';
@@ -25,7 +26,8 @@ import { ToastHost } from '../components/common/ToastHost';
 struct DeviceList {
   @State devices: Device[] = [];
   @State selectedType: DeviceType = DeviceType.LIGHT;
-  @State gridColumns: number = ThemeTokens.GRID_COLUMNS_PHONE;
+  @State tileColumns: number = ThemeTokens.GRID_TILES_PHONE;
+  @State cardColumns: number = ThemeTokens.GRID_CARDS_PHONE;
 
   private unsubscribe: Unsubscribe | undefined = undefined;
   private mediaListener: mediaquery.MediaQueryListener | undefined = undefined;
@@ -41,10 +43,18 @@ struct DeviceList {
 
   private onMediaChange: (result: mediaquery.MediaQueryResult) => void =
     (result: mediaquery.MediaQueryResult): void => {
-      this.gridColumns = result.matches
-        ? ThemeTokens.GRID_COLUMNS_TABLET
-        : ThemeTokens.GRID_COLUMNS_PHONE;
+      this.applyBreakpoint(result.matches);
     };
+
+  /** 断点 → 列数（唯一换算处，避免列数逻辑散落）。 */
+  private applyBreakpoint(isTablet: boolean): void {
+    this.tileColumns = isTablet
+      ? ThemeTokens.GRID_TILES_TABLET
+      : ThemeTokens.GRID_TILES_PHONE;
+    this.cardColumns = isTablet
+      ? ThemeTokens.GRID_CARDS_TABLET
+      : ThemeTokens.GRID_CARDS_PHONE;
+  }
 
   private onStateChange: StateChangeHandler = (change: ChangeSet): void => {
     this.refresh();
@@ -52,9 +62,7 @@ struct DeviceList {
 
   aboutToAppear(): void {
     this.mediaListener = mediaquery.matchMediaSync(ThemeTokens.tabletQuery());
-    this.gridColumns = this.mediaListener.matches
-      ? ThemeTokens.GRID_COLUMNS_TABLET
-      : ThemeTokens.GRID_COLUMNS_PHONE;
+    this.applyBreakpoint(this.mediaListener.matches);
     this.mediaListener.on('change', this.onMediaChange);
     this.unsubscribe = AppDataRepository.getInstance().subscribe(this.onStateChange);
     this.refresh();
@@ -103,11 +111,12 @@ struct DeviceList {
         })
 
         SectionCard({ title: '添加模拟设备', caption: '选择类型后点击添加（FR-02-04）' }) {
-          GridRow({ columns: this.gridColumns, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
+          GridRow({ columns: this.tileColumns, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
             ForEach(this.typeOptions, (type: DeviceType, index: number): void => {
               GridCol({ span: 1 }) {
                 Button(this.typeNames[index])
                   .fontSize(ThemeTokens.FONT_BODY)
+                  .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                   .fontColor(this.selectedType === type
                     ? ThemeTokens.TEXT_ON_PRIMARY : ThemeTokens.PRIMARY)
                   .backgroundColor(this.selectedType === type
@@ -124,6 +133,7 @@ struct DeviceList {
           .width('100%')
           Button('添加设备（' + this.selectedType + '）')
             .fontSize(ThemeTokens.FONT_BODY)
+            .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
             .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
             .backgroundColor(ThemeTokens.ACCENT)
             .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -145,13 +155,14 @@ struct DeviceList {
               }
             })
           } else {
-            GridRow({ columns: this.gridColumns, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
+            GridRow({ columns: this.cardColumns, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
               ForEach(this.devices, (device: Device): void => {
                 GridCol({ span: 1 }) {
                   Column() {
                     DeviceCard({ device: device })
                     Button('删除此设备')
                       .fontSize(ThemeTokens.FONT_CAPTION)
+                      .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                       .fontColor(ThemeTokens.STATUS_FAULT)
                       .backgroundColor(ThemeTokens.WARNING_BACKGROUND)
                       .borderRadius(ThemeTokens.RADIUS_CONTROL)

@@ -38,7 +38,8 @@ struct Index {
   @State abnormalCount: number = 0;
   @State ruleCount: number = 0;
   @State currentMode: string = 'MANUAL';
-  @State gridColumns: number = ThemeTokens.GRID_COLUMNS_PHONE;
+  @State tileColumns: number = ThemeTokens.GRID_TILES_PHONE;
+  @State cardColumns: number = ThemeTokens.GRID_CARDS_PHONE;
 
   private unsubscribe: Unsubscribe | undefined = undefined;
   private mediaListener: mediaquery.MediaQueryListener | undefined = undefined;
@@ -53,10 +54,14 @@ struct Index {
 
   private onMediaChange: (result: mediaquery.MediaQueryResult) => void =
     (result: mediaquery.MediaQueryResult): void => {
-      this.gridColumns = result.matches
-        ? ThemeTokens.GRID_COLUMNS_TABLET
-        : ThemeTokens.GRID_COLUMNS_PHONE;
+      this.applyBreakpoint(result.matches);
     };
+
+  /** 断点 → 列数（唯一换算处）：入口小格子 sm 2 列 / md+ 3 列；设备卡片 sm 单列 / md+ 2 列。 */
+  private applyBreakpoint(isTablet: boolean): void {
+    this.tileColumns = isTablet ? ThemeTokens.GRID_TILES_TABLET : ThemeTokens.GRID_TILES_PHONE;
+    this.cardColumns = isTablet ? ThemeTokens.GRID_CARDS_TABLET : ThemeTokens.GRID_CARDS_PHONE;
+  }
 
   private onStateChange: StateChangeHandler = (change: ChangeSet): void => {
     this.refresh();
@@ -64,9 +69,7 @@ struct Index {
 
   aboutToAppear(): void {
     this.mediaListener = mediaquery.matchMediaSync(ThemeTokens.tabletQuery());
-    this.gridColumns = this.mediaListener.matches
-      ? ThemeTokens.GRID_COLUMNS_TABLET
-      : ThemeTokens.GRID_COLUMNS_PHONE;
+    this.applyBreakpoint(this.mediaListener.matches);
     this.mediaListener.on('change', this.onMediaChange);
     this.unsubscribe = AppDataRepository.getInstance().subscribe(this.onStateChange);
     this.refresh();
@@ -136,6 +139,15 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor(ThemeTokens.PRIMARY)
         .margin({ top: 6 })
+        // 387.7vp 下四宫格每格约 58vp 可用宽，"49.7%RH" 在 20fp 会被折成两行
+        // （真机 DEV-05，表现为 "50%R" + "H"）。单行 + 自适应缩字号。
+        .maxLines(1)
+        .minFontSize(11)
+        .maxFontSize(20)
+        .heightAdaptivePolicy(TextHeightAdaptivePolicy.MIN_FONT_SIZE_FIRST)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .textAlign(TextAlign.Center)
+        .width('100%')
     }
     .layoutWeight(1)
     .padding(ThemeTokens.SPACE_ITEM_GAP)
@@ -195,6 +207,7 @@ struct Index {
           Row() {
             Button('刷新聚合数值')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -210,7 +223,7 @@ struct Index {
 
         // —— 六模块入口（FR-01-08，全部真实跳转）——
         SectionCard({ title: '功能入口', caption: '六个模块全部可访问，无装饰性入口' }) {
-          GridRow({ columns: this.gridColumns, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
+          GridRow({ columns: this.tileColumns, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
             ForEach(this.moduleEntries, (entry: ModuleEntry): void => {
               GridCol({ span: 1 }) {
                 Column() {
@@ -224,6 +237,7 @@ struct Index {
                     .margin({ top: 4, bottom: ThemeTokens.SPACE_ITEM_GAP })
                   Button('进入')
                     .fontSize(ThemeTokens.FONT_CAPTION)
+                    .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                     .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
                     .backgroundColor(ThemeTokens.PRIMARY)
                     .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -247,7 +261,7 @@ struct Index {
           title: '设备状态',
           caption: '共 ' + this.devices.length + ' 台设备，卡片可进详情 / 快速开关'
         }) {
-          GridRow({ columns: this.gridColumns, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
+          GridRow({ columns: this.cardColumns, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
             ForEach(this.devices, (device: Device): void => {
               GridCol({ span: 1 }) {
                 DeviceCard({ device: device })
@@ -257,7 +271,7 @@ struct Index {
           .width('100%')
         }
 
-        Text('阶段二工程骨架 · 业务逻辑将在 ST-03 接入 · 未进行真机运行验证')
+        Text('数据来自 AppDataRepository 内存态 · 未进行真机运行验证')
           .fontSize(ThemeTokens.FONT_CAPTION)
           .fontColor(ThemeTokens.TEXT_HINT)
           .width('100%')

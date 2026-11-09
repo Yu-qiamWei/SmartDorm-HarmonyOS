@@ -47,6 +47,7 @@ export struct ToastHostPreview {
         .fontColor(ThemeTokens.TEXT_SECONDARY)
         .margin({ bottom: ThemeTokens.SPACE_ITEM_GAP })
       Button('触发「无变更」反馈')
+        .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
         .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
         .backgroundColor(ThemeTokens.PRIMARY)
         .borderRadius(ThemeTokens.RADIUS_CONTROL)

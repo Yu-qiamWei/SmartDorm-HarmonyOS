@@ -1,7 +1,7 @@
 /**
  * 智寓 · 规则创建/编辑（FR-04-01~05 / T-04）
  * 多条件 AND、多动作有序、优先级、目标设备、参数校验、保存/取消全部真实交互；
- * 保存走 Service 契约占位并 Toast 反馈，阶段二明确不真实写入。
+ * 保存走 ServiceFacade.createRule/updateRule 真实写入内存态；落盘见 ST-04。
  */
 import { AutomationRule } from '../model/AutomationRule';
 import { AutomationCondition } from '../model/AutomationCondition';
@@ -72,6 +72,13 @@ struct RuleEdit {
     this.validationNote = code === ResultCode.OK
       ? '参数校验：阈值 ' + this.threshold + '℃ 合法（-10—50）'
       : '参数校验：阈值越界，将被拒绝（INVALID_PARAM）';
+    // conditionDrafts 是给界面看的文本，真正的数据源是 this.threshold（buildRule 只读它）。
+    // 二者必须同步重建，否则阈值已改而列表仍显示旧文案，用户会误判保存的规则内容（DEV-03）。
+    const next: string[] = [];
+    for (let i = 0; i < this.conditionDrafts.length; i++) {
+      next.push('温度 大于 ' + this.threshold + '℃');
+    }
+    this.conditionDrafts = next;
   }
 
   private targetDeviceId(): string {
@@ -112,7 +119,10 @@ struct RuleEdit {
         id: IdGenerator.action(),
         targetDeviceId: target,
         command: DeviceCommand.POWER_ON,
-        value: 1,
+        // 开关类命令（commandToParamKey => 'powerOn'）的取值必须是布尔值，
+        // RuleService.validateAction 会以 typeof 校验；此处若写数字 1 会被判定
+        // INVALID_PARAM 导致规则永远创建失败（真机回归缺陷 DEV-01 根因）。
+        value: true,
         order: i
       };
       actions.push(action);
@@ -145,7 +155,9 @@ struct RuleEdit {
       if (result.changed) {
         RouteMap.back();
       } else {
-        this.saveNote = '阶段二接口占位：未真实写入，草稿已保留在本页';
+        // 失败必须回显真实原因。此前该分支写死「阶段二接口占位：未真实写入」，
+        // 会把 INVALID_PARAM 等真实返回码掩盖成"占位未实现"，属误导性提示（DEV-02）。
+        this.saveNote = result.message;
       }
     });
   }
@@ -171,6 +183,7 @@ struct RuleEdit {
           Row() {
             Button('优先级 −')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -185,6 +198,7 @@ struct RuleEdit {
               .textAlign(TextAlign.Center)
             Button('优先级 +')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -206,6 +220,7 @@ struct RuleEdit {
                 .layoutWeight(1)
               Button('移除')
                 .fontSize(ThemeTokens.FONT_CAPTION)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.STATUS_FAULT)
                 .backgroundColor(ThemeTokens.WARNING_BACKGROUND)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -217,10 +232,11 @@ struct RuleEdit {
             }
             .width('100%')
             .margin({ bottom: 6 })
-          }, (draft: string, index: number): string => 'cond_' + index)
+          }, (draft: string, index: number): string => 'cond_' + index + '_' + draft)
           Row() {
             Button('阈值 −1')
               .fontSize(ThemeTokens.FONT_CAPTION)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -231,6 +247,7 @@ struct RuleEdit {
               })
             Button('阈值 +1')
               .fontSize(ThemeTokens.FONT_CAPTION)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -244,6 +261,7 @@ struct RuleEdit {
           .width('100%')
           Button('添加条件（温度大于 ' + this.threshold + '℃）')
             .fontSize(ThemeTokens.FONT_BODY)
+            .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
             .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
             .backgroundColor(ThemeTokens.PRIMARY)
             .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -266,6 +284,7 @@ struct RuleEdit {
                 .layoutWeight(1)
               Button('移除')
                 .fontSize(ThemeTokens.FONT_CAPTION)
+                .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                 .fontColor(ThemeTokens.STATUS_FAULT)
                 .backgroundColor(ThemeTokens.WARNING_BACKGROUND)
                 .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -281,6 +300,7 @@ struct RuleEdit {
           Row() {
             Button('切换目标设备')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -291,6 +311,7 @@ struct RuleEdit {
               })
             Button('添加动作')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
               .backgroundColor(ThemeTokens.PRIMARY)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -307,6 +328,7 @@ struct RuleEdit {
           Row() {
             Button('保存规则')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.TEXT_ON_PRIMARY)
               .backgroundColor(ThemeTokens.ACCENT)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)
@@ -316,6 +338,7 @@ struct RuleEdit {
               })
             Button('取消返回')
               .fontSize(ThemeTokens.FONT_BODY)
+              .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
               .fontColor(ThemeTokens.PRIMARY)
               .backgroundColor(ThemeTokens.PAGE_BACKGROUND)
               .borderRadius(ThemeTokens.RADIUS_CONTROL)

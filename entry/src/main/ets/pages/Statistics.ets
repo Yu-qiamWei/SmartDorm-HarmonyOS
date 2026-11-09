@@ -1,10 +1,11 @@
 /**
- * 智寓 · 数据统计与历史（FR-06 / Q-03 / T-04 D6）
+ * 智寓 · 数据统计与历史（FR-06 / Q-03 / T4-D6）
  *
- * 折线图 / 柱状图均为 ArkUI Canvas 自绘组件，接收真实数组：
- *   - LineChart 接收 buildLineModel(真实 EnvironmentLog[])（阶段二为空，组件自绘空态）
- *   - BarChart 接收 buildLiveEnvironmentBarModel(真实 EnvironmentData 当前读数)（5 根真实柱）
- * 禁止静态图片、禁止硬编码演示数据点、禁止预置执行日志。
+ * 三张 Canvas 自绘图表，全部接收**真实**数据（无静态图片、无演示数据点）：
+ *   ① LineChart   ← buildLineModel(真实 EnvironmentLog[])　　　　　温度历史
+ *   ② BarChart    ← buildLiveEnvironmentBarModel(真实当前读数)　　环境实时读数
+ *   ③ BarChart    ← buildBarModel(真实 OperationLog[] + Device[])　设备运行统计（按设备类型分组）
+ * 无记录时由组件自绘空态文案；禁止预置演示数据。
  */
 import { mediaquery } from '@kit.ArkUI';
 import { AppState } from '../model/AppState';
@@ -40,15 +41,20 @@ struct Statistics {
   @State barModel: BarChartModel = {
     title: '当前环境读数', unit: '读数', bars: [], color: ThemeTokens.ACCENT
   };
+  /** 设备运行统计（按设备类型分组，数据源 = 真实 OperationLog[] + Device[]）。 */
+  @State deviceBarModel: BarChartModel = {
+    title: '设备操作次数', unit: '次', bars: [], color: ThemeTokens.PRIMARY
+  };
   @State successRateValue: number = 0;
   @State operationCount: number = 0;
   @State ruleCount: number = 0;
   @State envCount: number = 0;
   @State sceneCount: number = 0;
-  @State chartColumns: number = 1;
+  @State chartColumns: number = ThemeTokens.GRID_CHARTS_PHONE;
 
   private unsubscribe: Unsubscribe | undefined = undefined;
   private mediaListener: mediaquery.MediaQueryListener | undefined = undefined;
+  private largeListener: mediaquery.MediaQueryListener | undefined = undefined;
   private tabs: LogTab[] = [
     { label: '操作记录', type: LogType.OPERATION },
     { label: '执行记录', type: LogType.RULE_EXECUTION },
@@ -58,8 +64,26 @@ struct Statistics {
 
   private onMediaChange: (result: mediaquery.MediaQueryResult) => void =
     (result: mediaquery.MediaQueryResult): void => {
-      this.chartColumns = result.matches ? 2 : 1;
+      this.applyChartColumns();
     };
+
+  private onLargeChange: (result: mediaquery.MediaQueryResult) => void =
+    (result: mediaquery.MediaQueryResult): void => {
+      this.applyChartColumns();
+    };
+
+  /** 图表列数三档：手机 1 列 / 平板 2 列 / 大屏 3 列（唯一换算处）。 */
+  private applyChartColumns(): void {
+    const isLarge: boolean = this.largeListener !== undefined && this.largeListener.matches;
+    const isTablet: boolean = this.mediaListener !== undefined && this.mediaListener.matches;
+    if (isLarge) {
+      this.chartColumns = ThemeTokens.GRID_CHARTS_LARGE;
+    } else if (isTablet) {
+      this.chartColumns = ThemeTokens.GRID_CHARTS_TABLET;
+    } else {
+      this.chartColumns = ThemeTokens.GRID_CHARTS_PHONE;
+    }
+  }
 
   private onStateChange: StateChangeHandler = (change: ChangeSet): void => {
     this.refresh();
@@ -67,8 +91,10 @@ struct Statistics {
 
   aboutToAppear(): void {
     this.mediaListener = mediaquery.matchMediaSync(ThemeTokens.tabletQuery());
-    this.chartColumns = this.mediaListener.matches ? 2 : 1;
+    this.largeListener = mediaquery.matchMediaSync(ThemeTokens.largeQuery());
     this.mediaListener.on('change', this.onMediaChange);
+    this.largeListener.on('change', this.onLargeChange);
+    this.applyChartColumns();
     this.unsubscribe = AppDataRepository.getInstance().subscribe(this.onStateChange);
     this.refresh();
   }
@@ -77,6 +103,10 @@ struct Statistics {
     if (this.mediaListener !== undefined) {
       this.mediaListener.off('change', this.onMediaChange);
       this.mediaListener = undefined;
+    }
+    if (this.largeListener !== undefined) {
+      this.largeListener.off('change', this.onLargeChange);
+      this.largeListener = undefined;
     }
     if (this.unsubscribe !== undefined) {
       this.unsubscribe();
@@ -94,6 +124,8 @@ struct Statistics {
     this.sceneCount = state.logs.sceneSwitches.length;
     this.lineModel = facade.buildLineModel(state.logs.environment, SensorType.TEMPERATURE);
     this.barModel = facade.buildLiveEnvironmentBarModel(env);
+    // 第三张图：按设备类型分组统计真实操作次数（形参 groupBy 仅为兼容旧签名，不参与计算）
+    this.deviceBarModel = facade.buildBarModel(state.logs.operations, 'deviceType');
     this.successRateValue = facade.successRate(state.logs.ruleExecutions);
   }
 
@@ -153,20 +185,25 @@ struct Statistics {
             }
           }
           .width('100%')
-          Text('规则执行成功率（真实日志派生）：' + this.successRateValue)
+          // successRate 返回 0~1 的比值，直接拼接会显示成 "1"（真机 DEV-06）。
+          // 统一按百分比展示，保留一位小数。
+          Text('规则执行成功率（真实日志派生）：' + (this.successRateValue * 100).toFixed(1) + '%')
             .fontSize(ThemeTokens.FONT_CAPTION)
             .fontColor(ThemeTokens.TEXT_SECONDARY)
             .width('100%')
             .margin({ top: ThemeTokens.SPACE_ITEM_GAP })
         }
 
-        // —— Canvas 自绘图表（响应式：平板两列，手机单列）——
+        // —— 三张 Canvas 自绘图表（响应式：手机单列 / 平板两列 / 大屏三列）——
         GridRow({ columns: this.chartColumns, gutter: ThemeTokens.SPACE_ITEM_GAP }) {
           GridCol({ span: 1 }) {
             LineChart({ model: this.lineModel })
           }
           GridCol({ span: 1 }) {
             BarChart({ model: this.barModel })
+          }
+          GridCol({ span: 1 }) {
+            BarChart({ model: this.deviceBarModel })
           }
         }
         .width('100%')
@@ -178,6 +215,7 @@ struct Statistics {
               GridCol({ span: 1 }) {
                 Button(tab.label)
                   .fontSize(ThemeTokens.FONT_BODY)
+                  .constraintSize({ minHeight: ThemeTokens.TOUCH_MIN_HEIGHT })
                   .fontColor(this.selectedType === tab.type
                     ? ThemeTokens.TEXT_ON_PRIMARY : ThemeTokens.PRIMARY)
                   .backgroundColor(this.selectedType === tab.type
@@ -198,7 +236,7 @@ struct Statistics {
             .width('100%')
             .margin({ top: ThemeTokens.SPACE_ITEM_GAP })
           if (this.selectedRecords().length === 0) {
-            Text('暂无该类记录（阶段二禁止预置演示日志；ST-03 真实写入后可查）')
+            Text('暂无该类记录（系统不预置演示日志，真实操作后产生）')
               .fontSize(ThemeTokens.FONT_BODY)
               .fontColor(ThemeTokens.TEXT_SECONDARY)
               .width('100%')
