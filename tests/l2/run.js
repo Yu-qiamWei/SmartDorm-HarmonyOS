@@ -24,7 +24,8 @@ const TESTS = [
   't402_serializer.js',
   't402_migration.js',
   't402_diagnostics.js',
-  't403_repository.js'
+  't403_repository.js',
+  't405_business.js'
 ];
 
 function runNode(args, cwd) {

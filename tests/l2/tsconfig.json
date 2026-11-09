@@ -27,6 +27,9 @@
     ".gen/src/store/Serializer.ts",
     ".gen/src/store/SchemaMigration.ts",
     ".gen/src/store/StorageDiagnostics.ts",
-    ".gen/src/store/AppDataRepository.ts"
+    ".gen/src/store/AppDataRepository.ts",
+    ".gen/src/service/RuleMatcher.ts",
+    ".gen/src/service/WriteGuard.ts",
+    ".gen/src/common/ParamSchema.ts"
   ]
 }
