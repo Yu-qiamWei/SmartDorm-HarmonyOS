@@ -26,43 +26,47 @@ sequenceDiagram
     participant LS as LogService
     participant REPO as AppDataRepository（IStateWriter）
     participant RE as RuleEngine
+    participant RM as RuleMatcher（纯函数）
     participant WG as WriteGuard
     participant RAE as RuleActionExecutor
     participant DS as DeviceService
     participant MDA as MockDeviceAdapter
 
     UI->>ES: adjust(sensorType, value, MANUAL)
-    ES->>ES: validateSensorValue(sensorType, value)<br/>越界 → INVALID_PARAM 或按 FR-03-09 钳制
-    ES->>REPO: commitEnvironment(next, 'env-adjust')
-    ES->>LS: appendEnvironment(EnvironmentLog)
+    ES->>ES: validateSensorValue(sensorType, value)<br/>越界 → INVALID_PARAM（不静默钳制）
+    ES->>REPO: getState().environment 读当前值
+    Note over ES: 读数未变化 → 直接返回 NO_CHANGE，<br/>不写 EnvironmentLog、不触发求值（FR-02-08）
+    ES->>LS: appendEnvironment(EnvironmentLog)<br/>（先写操作日志）
     LS->>REPO: appendEnvironmentLog(log)<br/>（上限 2000，FIFO 丢最旧）
-    ES->>RE: evaluate(next)<br/>（经 setEvaluationTrigger 注入，非直接 import）
+    ES->>REPO: commitEnvironment(next, 'environment-adjust')<br/>（后写权威态）
+    ES->>RE: fireTrigger(next) → evaluate(next)<br/>（经 setEvaluationTrigger 注入，非直接 import）
     RE->>REPO: getState() 读 settings 与 rules
     alt automationEnabled = false
         RE-->>ES: RuleEvaluationReport{skipReason, newLogs: []}
         Note over RE: 总开关关闭：不执行、不写任何日志
     else 开启
         RE->>WG: new WriteGuard() → reset()<br/>（护栏 B-1：不跨轮持有）
-        RE->>RE: sortRules(priority ↑ → createdAt ↑ → id ↑)
+        RE->>RM: sortRules(enabledRules)<br/>（priority ↑ → createdAt ↑ → id ↑，纯函数）
         loop 有序规则列表逐条
-            RE->>RE: evalConditions(rule, snapshot) AND 组合
+            RE->>RM: matchConditions(rule, snapshot)<br/>（AND 组合，纯函数）
             alt 条件不满足
-                RE->>RE: lastSatisfied = false（复位，重新武装边沿）
+                RE->>RE: rewritten.set(id, withDedup(rule, false))<br/>（复位，重新武装边沿）
             else 条件满足 且 lastSatisfied = false（边沿成立）
-                RE->>RE: lastSatisfied = true
-                loop actions 按 order 升序
-                    RE->>WG: claim(deviceId, paramKey, ruleId)
+                RE->>RE: 记入 triggeredRules（本轮结束时 withDedup(rule, true) + afterTrigger）
+                loop actions 按 order 升序（RE 内部 RuleEngine.sortActions）
+                    RE->>RAE: execute(action, guard, ruleId)
+                    RAE->>RAE: commandToParamKey(action.command)<br/>（护栏 B-4：唯一映射）
+                    RAE->>WG: claim(deviceId, paramKey, ruleId)
                     alt claim = false（同设备同参数已被本轮前序规则写过）
-                        RE->>RE: ActionOutcome{code: CONFLICT_SKIPPED}
-                        Note over RE,DS: ★ 护栏 B-2：禁止隐式覆盖，<br/>不得调用 DeviceService
+                        RAE-->>RE: ActionOutcome{code: CONFLICT_SKIPPED}
+                        Note over RAE,DS: ★ 护栏 B-2：claim 失败即返回，<br/>不进入 applyCommand、不触碰设备
                     else claim = true
-                        RE->>RAE: execute(action, guard, ruleId)
-                        RAE->>DS: setPower / setParam(id, key, value, RULE)
+                        RAE->>DS: applyCommand → setPower / setParam(id, key, value, RULE)
                         DS->>MDA: apply(DeviceCommandContext)
                         MDA-->>DS: CommandResult[Device]（可返回 DEVICE_OFFLINE）
-                        DS->>LS: appendOperation(OperationLog actor=RULE)
+                        DS->>REPO: commitDevices(devices, 'device-command')<br/>（先写权威态）
+                        DS->>LS: appendOperation(OperationLog actor=RULE)<br/>（后写操作日志）
                         LS->>REPO: appendOperationLog(log)<br/>（上限 1000，FIFO 丢最旧）
-                        DS->>REPO: commitDevices(devices, 'rule-action')
                         DS-->>RAE: CommandResult[Device]
                         RAE-->>RE: ActionOutcome
                     end
@@ -75,7 +79,7 @@ sequenceDiagram
         RE->>REPO: ① commitRules(nextRules, 'rule-eval')<br/>回写 lastSatisfied / lastTriggeredAt / executionCount
         RE->>REPO: ② commitRuleLogs(report)<br/>（护栏 A-2 唯一入口，上限 1000 FIFO）
         Note over RE,REPO: ★ 顺序不可调换：先规则状态、后执行日志<br/>否则会出现「日志说执行了、lastSatisfied 仍 false」→ 下轮刷屏
-        RE->>REPO: notify(reason, partitions)
+        Note over REPO: 每个 commit* / append*Log 内部固定三步：① 写内存态 → ② notify(reason, partitions) → ③ markDirty<br/>（RE 自身不调用 notify）
         RE-->>ES: RuleEvaluationReport
     end
     ES-->>UI: CommandResult[EnvironmentData] + Toast 反馈
@@ -92,7 +96,7 @@ sequenceDiagram
     participant LS as LogService
 
     UI->>DS: setPower(id, on, USER) 或 setParam(id, key, value, USER)
-    DS->>REPO: findDevice(id) / getState()
+    DS->>REPO: checkWritable(id) → findDevice(id)<br/>（① 存在性 ② 在线且非故障）
     alt ① 设备不存在
         DS-->>UI: CommandResult{code: NOT_FOUND, changed: false}
     else ② offline 或 status = FAULT / OFFLINE
@@ -110,10 +114,9 @@ sequenceDiagram
         else 状态不同
             DS->>MDA: apply(DeviceCommandContext)
             MDA-->>DS: CommandResult[Device]（返回新对象，不改权威态）
-            DS->>LS: appendOperation(OperationLog actor=USER)
+            DS->>REPO: commitDevices(devices, 'device-command')<br/>（先写权威态）
+            DS->>LS: appendOperation(OperationLog actor=USER)<br/>（后写操作日志）
             LS->>REPO: appendOperationLog(log)（上限 1000，FIFO）
-            DS->>REPO: commitDevices(devices, 'device-control')
-            DS->>REPO: notify(reason, partitions)
             REPO-->>UI: 刷新卡片 / 聚合数值 / 状态徽标
             DS-->>UI: CommandResult[Device]{code: OK, changed: true}
         end
@@ -199,17 +202,17 @@ sequenceDiagram
     participant LS as LogService
 
     UI->>SS: apply(sceneId)
-    SS->>REPO: getState() 读 scenes / returnSnapshot / currentSceneId
+    SS->>REPO: findScene(sceneId) + getState()<br/>（currentSceneId / returnSnapshot）
     alt 目标场景不存在
         SS-->>UI: SceneApplyReport{total: 0}（不抛异常、不静默）
     else 目标为「离寝」AWAY
         SS->>SS: captureSnapshot() 采集当前逐设备状态
         SS->>REPO: commitReturnSnapshot(snapshot)（KEY-10 独立分区）
         SS->>SS: targets = scene.deviceStates
-    else 目标为「回寝」RETURN
+    else 目标为「回寝」RETURN 且**上一场景为离寝**且快照非空
         SS->>REPO: getState().returnSnapshot
         REPO-->>SS: 用户离寝前预设快照（非系统默认值）
-        SS->>SS: targets = returnSnapshot
+        SS->>SS: targets = returnSnapshot，restoredFromSnapshot = true
     else 其他场景
         SS->>SS: targets = scene.deviceStates
     end
@@ -225,6 +228,6 @@ sequenceDiagram
     end
     SS->>LS: appendSceneSwitch(SceneSwitchLog)
     LS->>REPO: appendSceneSwitchLog(log)（上限 500，FIFO）
-    SS->>REPO: commitCurrentScene(sceneId, mode) + commitScenes(...) + notify
+    SS->>REPO: commitCurrentScene(sceneId, mode)<br/>（apply 只切换当前场景指针，**不** commitScenes）
     SS-->>UI: SceneApplyReport（失败项在 UI 可见，不静默）
     Note over REPO: 阶段四：commit* → WriteQueue → PreferencesStore.put(KEY-04/07/09/10) → flush

@@ -1,13 +1,14 @@
 %% 智寓——HarmonyOS 智能宿舍管家 · 类图（对应报告表 2.1 / 3.1 / 3.2）
 %% 来源：design/系统架构设计.md 第 5 章（设计基线）+ 阶段二已提交代码的**实际字段与签名**（2026-11-09 同步）
 %%
-%% 【同步状态】V1.0.3：本文件与 `系统架构设计.md` 第 5 章**逐行一致**（同一份图，两处互为镜像）。字段与签名以「已提交代码 + 主理人 2026-11-09 六项裁决」为准。
-%%   · 已落地（阶段二，提交 3d3db9b / 8cb7ee4）：model/ 全部类型、AppDataRepository（内存态占位）、TimerHost（骨架）、EntryAbility（六钩子）、
+%% 【同步状态】V1.0.5（2026-11-09，图 ↔ 代码终检）：本文件与 `系统架构设计.md` 第 5 章**逐行一致**（同一份图，两处互为镜像）。字段与签名以**已提交代码**为准。
+%%   · 已落地（阶段二，提交 3d3db9b / 8cb7ee4）：model/ 全部类型、TimerHost（骨架）、EntryAbility（六钩子）、
 %%     ServiceContracts 的 7 个 interface + commandToParamKey、MockDataFactory、PreferencesOptions、StorageKeys
-%%   · 未落地（阶段三，见 design/任务列表-第三阶段.md）：各 Service 实现、RuleEngine、WriteGuard、RuleActionExecutor、
-%%     LogService、MockDeviceAdapter、EnvironmentSimulator、StatisticsService、SceneService、ExportService
-%%   · 未落地（阶段四）：PreferencesStore、Serializer、SchemaMigration、WriteQueue
-%% 标注约定：类内 `<<阶段三>>` / `<<阶段四>>` = 尚未实现；无标注 = 已提交代码中存在
+%%   · 已落地（阶段三，提交 4b6299c / f018c13 / a517f98 / c075a06 / a46f2e8 / 9c59d81 / 6502c9e）：各 Service 实现、RuleEngine、
+%%     RuleMatcher、RuleActionExecutor、WriteGuard、LogService、MockDeviceAdapter、EnvironmentSimulator、StatisticsService、
+%%     SceneService、ExportService、`IStateWriter`（10 个写入方法，唯一写入口）、`ServiceFacade`（页面唯一门面）、`Fifo`
+%%   · 未落地（阶段四）：PreferencesStore、Serializer、SchemaMigration、StorageDiagnostics、WriteQueue
+%% 标注约定：`<<阶段三>>` = 阶段三**已落地**（保留标注以标明引入阶段，不再表示「未实现」）；`<<阶段四>>` = 尚未实现；无标注 = 阶段二已提交
 %% 关系说明：*-- 聚合 / --> 依赖调用 / ..> 使用或产出 / ..|> 实现
 %% 类型说明：Mermaid classDiagram 的 ~T~ 不支持嵌套，故 Promise<CommandResult<T>> 统一简写为 Promise~CommandResult~；
 %%           WriteGuard.written 语义为 Map<string, Set<string>>（设计 B-3），图中简写为 Map~string, string[]~
@@ -381,6 +382,19 @@ classDiagram
         +listDevices() Device[]
         +commitRuleLogs(report) Promise~CommandResult~
     }
+    class IStateWriter {
+        <<interface>>
+        +commitDevices(devices, reason) void
+        +commitRules(rules, reason) void
+        +commitScenes(scenes, reason) void
+        +commitEnvironment(environment, reason) void
+        +commitSettings(settings, reason) void
+        +commitCurrentScene(sceneId, mode) void
+        +commitReturnSnapshot(snapshot) void
+        +appendOperationLog(log) void
+        +appendEnvironmentLog(log) void
+        +appendSceneSwitchLog(log) void
+    }
     class PreferencesOptions {
         +string name
         +string dataGroupId
@@ -401,10 +415,21 @@ classDiagram
         +subscribe(handler) Unsubscribe
         +notify(reason, partitions) void
         +subscriberCount() number
+        +dirtyPartitions() string[]
         +flush(partition) Promise~CommandResult~
         +reset(scope) Promise~CommandResult~
+        +commitDevices(devices, reason) void
+        +commitRules(rules, reason) void
+        +commitScenes(scenes, reason) void
+        +commitEnvironment(environment, reason) void
+        +commitSettings(settings, reason) void
+        +commitCurrentScene(sceneId, mode) void
+        +commitReturnSnapshot(snapshot) void
+        +appendOperationLog(log) void
+        +appendEnvironmentLog(log) void
+        +appendSceneSwitchLog(log) void
         +commitRuleLogs(report) Promise~CommandResult~
-        -trimFifo(kind) void
+        -markDirty(partition) void
     }
     class PreferencesStore {
         <<阶段四>>
@@ -459,7 +484,60 @@ classDiagram
         +stats() QueueStats
     }
 
-    %% ——————————————— 业务层（阶段三实现，接口已在 ServiceContracts 落地）———————————————
+    %% ——————————————— 页面唯一门面（T3-05，页面/组件只依赖本类 + 只读仓储）———————————————
+    class ServiceFacade {
+        <<阶段三>>
+        -ServiceFacade instance
+        +initialize(context) void
+        +setPower(id, on, actor) Promise~CommandResult~
+        +setParam(id, key, value, actor) Promise~CommandResult~
+        +addDevice(type, name) Promise~CommandResult~
+        +removeDevice(id) Promise~CommandResult~
+        +setDeviceStatus(id, status, actor) Promise~CommandResult~
+        +setOnline(id, online, actor) Promise~CommandResult~
+        +getEnvironmentSnapshot() EnvironmentData
+        +adjustEnvironment(sensorType, value, source) Promise~CommandResult~
+        +createRule(rule) Promise~CommandResult~
+        +updateRule(rule) Promise~CommandResult~
+        +removeRule(id) Promise~CommandResult~
+        +toggleRule(id, enabled) Promise~CommandResult~
+        +evaluateRules(snapshot) Promise~RuleEvaluationReport~
+        +applyScene(sceneId) Promise~SceneApplyReport~
+        +createScene(name) Promise~CommandResult~
+        +updateScene(scene) Promise~CommandResult~
+        +removeScene(sceneId) Promise~CommandResult~
+        +queryLogs(filter) LogRecord[]
+        +buildLineModel(logs, sensorType) LineChartModel
+        +buildBarModel(logs, groupBy) BarChartModel
+        +buildLiveEnvironmentBarModel(environment) BarChartModel
+        +successRate(logs) number
+        +updateSettings(settings) CommandResult~AppSettings~
+        +exportState(state, format) CommandResult~string~
+        +resetData(scope) Promise~CommandResult~
+        +flush() Promise~CommandResult~
+        -syncSampling(previous, next) void
+    }
+
+    %% ——————————————— 纯函数（阶段三，零 @kit，L2 可测）———————————————
+    class RuleMatcher {
+        <<阶段三>>
+        +sortRules(rules) AutomationRule[]
+        +matchConditions(rule, env) boolean
+        +matchedConditions(rule, env) AutomationCondition[]
+        +evaluateCondition(condition, env) boolean
+        +isEdgeTriggered(lastSatisfied, satisfied) boolean
+        +nextDedupFlag(prevSatisfied, satisfied) boolean
+        +resetDedup(rules) AutomationRule[]
+        +numericOf(sensorType, env) number
+    }
+    class Fifo {
+        <<阶段三>>
+        +limitOf(kind, logLimit) number
+        +trim(list, limit) T[]
+        +append(list, item, limit) T[]
+    }
+
+    %% ——————————————— 业务层（阶段三已落地，接口在 ServiceContracts 落地）———————————————
     class IDeviceService {
         <<interface>>
         +setPower(id, on, actor)
@@ -480,6 +558,7 @@ classDiagram
         +update(rule)
         +remove(id)
         +toggle(id, enabled)
+        +resetAllDedup() void
     }
     class IRuleEngine {
         <<interface>>
@@ -488,6 +567,9 @@ classDiagram
     class ISceneService {
         <<interface>>
         +apply(sceneId) Promise~SceneApplyReport~
+        +create(name) Promise~CommandResult~
+        +update(scene) Promise~CommandResult~
+        +remove(sceneId) Promise~CommandResult~
     }
     class ILogService {
         <<interface>>
@@ -501,6 +583,7 @@ classDiagram
         +buildLineModel(logs, sensorType) LineChartModel
         +buildBarModel(logs, devices) BarChartModel
         +successRate(logs) number
+        +averageDuration(logs) number
     }
     class IExportService {
         <<interface>>
@@ -515,7 +598,11 @@ classDiagram
         +removeDevice(id) Promise~CommandResult~
         +setDeviceStatus(id, status, actor) Promise~CommandResult~
         +setOnline(id, online, actor) Promise~CommandResult~
-        -validateChain(id, key, value) ResultCode
+        +installMockLookup() void
+        -execute(context, actor, actionLabel) CommandResult~Device~
+        -commitReplaced(next, reason) void
+        -checkWritable(id) ChainResult
+        -checkKind(device) ChainResult
     }
     class EnvironmentService {
         <<阶段三>>
@@ -535,13 +622,18 @@ classDiagram
     class RuleEngine {
         <<阶段三>>
         +evaluate(snapshot) Promise~RuleEvaluationReport~
-        -sortRules(rules) AutomationRule[]
-        -evalConditions(rule, snapshot) boolean
-        -buildExecutionLog(outcome) RuleExecutionLog
+        -sortActions(actions) AutomationAction[]
+        -buildExecutionLog(rule, snapshot, executed, skipped, status, errorMsg, durationMs) RuleExecutionLog
+        -withDedup(rule, satisfied) AutomationRule
+        -afterTrigger(rule, now) AutomationRule
+        -statusOf(executed, skipped) RuleExecStatus
+        -emptyReport(snapshot, settings, total, skipReason) RuleEvaluationReport
     }
     class RuleActionExecutor {
         <<阶段三>>
         +execute(action, guard, ruleId) Promise~ActionOutcome~
+        -applyCommand(action) Promise~CommandResult~
+        -conflictOutcome(action, paramKey) ActionOutcome
     }
     class WriteGuard {
         <<阶段三>>
@@ -583,7 +675,8 @@ classDiagram
     %% ——————————————— Mock 与入口 ———————————————
     class MockDeviceAdapter {
         <<阶段三>>
-        +apply(command) CommandResult~Device~
+        +setLookup(lookup) void
+        +apply(context) CommandResult~Device~
         +setDeviceStatus(id, status) CommandResult~Device~
         +setOnline(id, online) CommandResult~Device~
     }
@@ -678,6 +771,7 @@ classDiagram
     SceneApplyReport *-- SceneApplyItem : items
 
     AppDataRepository ..|> IAppDataRepository : 实现
+    AppDataRepository ..|> IStateWriter : 实现（唯一写入口，护栏 A-4）
     AppDataRepository *-- AppState : 单一数据源
     AppDataRepository --> PreferencesStore : MI-19（阶段四）
     AppDataRepository --> Serializer : 编解码（阶段四）
@@ -702,7 +796,8 @@ classDiagram
     EnvironmentService ..> RuleEngine : 经 setEvaluationTrigger 注入（不直接 import）
     RuleService --> AppDataRepository : commitRules
     RuleEngine --> AppDataRepository : getState / commitRules / commitRuleLogs
-    RuleEngine --> RuleActionExecutor : 执行动作
+    RuleEngine --> RuleMatcher : sortRules / matchConditions
+    RuleEngine --> RuleActionExecutor : 执行动作（内部先 claim 再 applyCommand）
     RuleEngine --> WriteGuard : 每轮 new + reset
     RuleEngine ..> RuleEvaluationReport : 产出
     RuleEngine ..> RuleExecutionLog : 唯一写入方（护栏 A-2）
@@ -715,8 +810,22 @@ classDiagram
     LogService --> AppDataRepository : append*Log（内部 FIFO）
     ExportService --> AppDataRepository : 读全量状态
 
-    EntryAbility --> AppDataRepository : 初始化 / 收尾
+    EntryAbility --> AppDataRepository : load / 收尾 flush
+    EntryAbility --> ServiceFacade : initialize(context) 唯一注入点
     EntryAbility --> TimerHost : 生命周期托管
     TimerHost --> EnvironmentSimulator : 驱动 tick
     EnvironmentSimulator --> EnvironmentService : applySampled
     MockDataFactory ..> AppState : 首次默认数据
+
+    ServiceFacade --> IDeviceService : 一行委托
+    ServiceFacade --> IEnvironmentService : 一行委托
+    ServiceFacade --> IRuleService : 一行委托
+    ServiceFacade --> IRuleEngine : 一行委托
+    ServiceFacade --> ISceneService : 一行委托
+    ServiceFacade --> ILogService : 一行委托
+    ServiceFacade --> IStatisticsService : 一行委托
+    ServiceFacade --> IExportService : 一行委托
+    ServiceFacade ..> AppDataRepository : resetData / flush / buildBarModel 读 devices
+    ServiceFacade ..> TimerHost : updateSettings 后同步采样开关与间隔
+    %% 注意：ServiceFacade **不持有** WriteGuard（B-1 每轮新建），也不实现 IStateWriter（护栏 A-4：门面不代为转写）
+    AppDataRepository --> Fifo : limitOf / trim / append（与写入同临界区）
