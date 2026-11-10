@@ -16,7 +16,7 @@
 > - **数据持久化已通过 12 步冷启动重启验收**：`preferences` 落盘原文可拉回、`bootCount 1→2`、`firstLaunchAt` 跨重启不变，设备 / 规则 / 场景 / 设置 / 环境 / 日志六类数据逐字段一致；`AppDataRepository.flush()` 为真实写入（非桩函数）。
 > - **构建状态**：`assembleHap` 构建成功，ArkTS 编译 0 ERROR / 0 WARN，产物为未签名 HAP（`entry-default-unsigned.hap`），已在 API 17 模拟器经 `hdc install -r` 实测安装运行。
 > - **载体诚实边界**：全部设备端验证在 API 17 模拟器经 `hdc` 完成，非物理真机；物理真机运行演示经本人 2026-11-09 裁定豁免、未执行，本文件与报告均如实标注，不冒充真机。
-> - 第 9 节「运行截图」内嵌展示关键界面，完整 200 张实拍归档于 `screenshots/`；第 10 节「功能演示」提供运行演示录屏的 GitHub Release 链接。
+> - 第 9 节「运行截图」内嵌展示关键界面，完整 200 张实拍归档于 `screenshots/`；第 10 节「功能演示」引用仓库内 `videos/SmartDorm-Demo.mp4` 录屏，并附 Release 备用下载。
 
 ---
 
@@ -196,7 +196,7 @@ SmartDorm-HarmonyOS/
 ├── evidence/                     # 证据归档：环境检查、逐阶段构建日志、阶段四验收报告、L2 断言输出、
 │                                 #   preferences 落盘原文（prefs_*）、导出快照（export_*）、设备侧 UI dump（device/）
 ├── screenshots/                  # 设备端实拍截图归档（API 17 模拟器，见第 9 节与本目录 README）
-├── videos/                       # 录屏不入库：大视频经 GitHub Release 分发（v1.0-demo，见第 10 节），本目录不存放视频文件
+├── videos/                       # 运行演示录屏 SmartDorm-Demo.mp4（19.5 MB，见第 10 节）；Release v1.0-demo 另附备用下载
 ├── deliverables/                 # 最终交付包（Word 报告等）
 ├── scripts/                      # 辅助脚本（build-hap.bat 命令行构建、设备采集 / 布局脚本）
 ├── hvigor/                       # hvigor wrapper
@@ -321,23 +321,23 @@ node tests/l2/run.js
 
 ## 10. 功能演示
 
-### 10.1 连续真实录屏（DL-05）：运行演示录屏已发布
+### 10.1 连续真实录屏（DL-05）：运行演示录屏已随仓库提供
 
-**运行演示录屏已通过 GitHub Release 发布（可在线观看 / 下载）**：
+**运行演示录屏已纳入仓库，位于 `videos/` 目录，可直接点击播放**：
 
 | 项 | 地址 |
 | --- | --- |
-| 录屏直链 | [SmartDorm-Demo.mp4（19.5 MB）](https://github.com/Yu-qiamWei/SmartDorm-HarmonyOS/releases/download/v1.0-demo/SmartDorm-Demo.mp4) |
-| Release 页面 | [v1.0-demo · 智能宿舍管家运行演示录屏](https://github.com/Yu-qiamWei/SmartDorm-HarmonyOS/releases/tag/v1.0-demo) |
+| 仓库内录屏 | [`videos/SmartDorm-Demo.mp4`（19.5 MB）](videos/SmartDorm-Demo.mp4) |
+| Release 备用下载 | [v1.0-demo · 智能宿舍管家运行演示录屏](https://github.com/Yu-qiamWei/SmartDorm-HarmonyOS/releases/tag/v1.0-demo) |
 
-> 视频通过 **Release 分发而非提交进 Git 仓库**，避免大二进制文件写入代码历史、拖慢克隆；因此 `videos/` 目录不存放视频文件，录屏以 Release 资产为准。
+> 视频文件已随仓库提交，克隆或下载仓库后可在 `videos/SmartDorm-Demo.mp4` 本地查看；另在 GitHub Release（v1.0-demo）保留一份相同资产，便于不克隆仓库时直接下载。
 
 ```
 启动 → 首页 → 手动控制 → 环境变化 → 创建规则 → 触发规则
      → 查看执行记录 → 切换场景 → 查看历史 → 重启验证数据恢复
 ```
 
-录屏已产出并发布至 GitHub Release（见本节上方链接），不归档进仓库 `videos/` 目录。
+录屏已随仓库提交于 `videos/SmartDorm-Demo.mp4`，并在 GitHub Release（v1.0-demo）保留备用下载。
 
 ### 10.2 分环节设备端证据链（已完成，补充录屏）
 
