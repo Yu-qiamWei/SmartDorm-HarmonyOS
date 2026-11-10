@@ -104,17 +104,17 @@
 │      ExportService / WriteGuard                           │
 ├──────────────────────────────────────────────────────────┤
 │  L3  数据模型层  model/                                   │
-│      Device / EnvironmentData / AutomationRule            │
-│      AutomationCondition / AutomationAction / Scene       │
+│      Device / EnvironmentData / AutomationRule           │
+│      AutomationCondition / AutomationAction / Scene      │
 │      OperationLog / RuleExecutionLog（8 个核心对象）       │
 ├──────────────────────────────────────────────────────────┤
 │  L4  数据存储层  store/                                   │
 │      AppDataRepository（单一数据入口 + 串行写入队列）       │
 │      StorageKeys / PreferencesOptions / RepositoryContract │
 ├──────────────────────────────────────────────────────────┤
-│  L5  Mock 仿真层  mock/                                    │
-│      EnvironmentSimulator / MockDeviceAdapter              │
-│      MockDataFactory / TimerHost（全局单例定时器）          │
+│  L5  Mock 仿真层  mock/                                   │
+│      EnvironmentSimulator / MockDeviceAdapter            │
+│      MockDataFactory / TimerHost（全局单例定时器）         │
 └──────────────────────────────────────────────────────────┘
              ▲ 依赖方向严格单向：L1 → L2 → L3 / L4 / L5
              │ 入口层 entryability/EntryAbility.ets
@@ -331,8 +331,6 @@ node tests/l2/run.js
 | Release 页面 | [v1.0-demo · 智能宿舍管家运行演示录屏](https://github.com/Yu-qiamWei/SmartDorm-HarmonyOS/releases/tag/v1.0-demo) |
 
 > 视频通过 **Release 分发而非提交进 Git 仓库**，避免大二进制文件写入代码历史、拖慢克隆；因此 `videos/` 目录不存放视频文件，录屏以 Release 资产为准。
-
-**用户 2026-11-09 裁定「本项目不需要实机演示」并明确「继续完成真机模拟」**：据此**豁免物理真机运行展示类交付**——DL-05 连续真实录屏、报告图 6.1 / 图 6.2 的真机截图要求不再作为交付前置。**DL-05 的 P0 需求描述与 10 环节验收标准原样保留并如实标注已豁免**，不写成「已完成」、不以 Previewer 截图 / 静态图 / 分环节截图冒充物理真机录屏；改由 **API 17 模拟器经 `hdc` 的设备端真实执行证据**（逐环节实拍截图 + 状态导出 + PRD 第 16 章表 5.1 真实结果）覆盖验证，**测试判据一条不降**。录屏 10 环节（需求原始描述，保留）：
 
 ```
 启动 → 首页 → 手动控制 → 环境变化 → 创建规则 → 触发规则
