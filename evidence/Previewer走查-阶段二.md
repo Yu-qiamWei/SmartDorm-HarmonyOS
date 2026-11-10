@@ -1,7 +1,7 @@
 # 阶段二 · 页面 / 组件走查记录（源码级，非 Previewer 截图）
 
 - 记录时间：2026-11-09（GMT+8）
-- 记录人：寇豆码（工程师）· 团队 software-smartdorm
+- 记录人：工程师（角色化工作流，非真实人员）
 - **性质声明（重要）**：本次会话**未启动 DevEco Studio Previewer**、**未产生任何 Previewer 截图**，
   也**未进行真机运行验证**。原因：当前为命令行会话，无法启动 IDE GUI；`hdc list targets=[Empty]`，
   已部署模拟器镜像最高 API 12 与 SDK API 17 不匹配；且 L1 构建在 SDK 组件扫描阶段失败

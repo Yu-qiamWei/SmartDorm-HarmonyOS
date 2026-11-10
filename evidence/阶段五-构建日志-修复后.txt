@@ -1,5 +1,5 @@
 ============================================================
-ST-05 P0 缺陷修复后构建日志（工程师 寇豆码 / 最终版）
+ST-05 P0 缺陷修复后构建日志（工程师角色 / 最终版）
 工作目录: D:/SmartDormHarmonyOS
 命令(Git-Bash):
   export DEVECO_SDK_HOME="D:/DevEco Studio/sdk" && node "D:/DevEco Studio/tools/hvigor/bin/hvigorw.js" --mode module -p product=default assembleHap --no-daemon
@@ -45,7 +45,7 @@ ST-05 P0 缺陷修复后构建日志（工程师 寇豆码 / 最终版）
 > hvigor BUILD SUCCESSFUL in 50 s 402 ms 
 
 ============================================================
-追加：阶段 B 三缺陷（D-1/D-2/D-3）修复后复构建（工程师 寇豆码）
+追加：阶段 B 三缺陷（D-1/D-2/D-3）修复后复构建（工程师角色）
 命令(Git-Bash):
   export DEVECO_SDK_HOME="D:/DevEco Studio/sdk" && node "D:/DevEco Studio/tools/hvigor/bin/hvigorw.js" --mode module -p product=default assembleHap --no-daemon
 涉及文件: pages/RuleEdit.ets（TextInput 暂存区 / 越界守卫 / 移除守卫）、pages/Environment.ets（模拟开关读权威态）
@@ -86,7 +86,7 @@ ST-05 P0 缺陷修复后构建日志（工程师 寇豆码 / 最终版）
 > hvigor BUILD SUCCESSFUL in 1 min 25 s 7 ms 
 
 ============================================================
-追加：最终 HAP 构建（第 5 个文件 Settings.ets 修复后，工程师 寇豆码）
+追加：最终 HAP 构建（第 5 个文件 Settings.ets 修复后，工程师角色）
 工作目录: D:/SmartDormHarmonyOS
 命令(Git-Bash):
   export DEVECO_SDK_HOME="D:/DevEco Studio/sdk" && node "D:/DevEco Studio/tools/hvigor/bin/hvigorw.js" --mode module -p product=default assembleHap --no-daemon
